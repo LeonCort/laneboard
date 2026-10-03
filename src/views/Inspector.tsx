@@ -977,6 +977,56 @@ export function Inspector({
                         ),
                       )}
                     </Select>
+                    {(["width", "height"] as const).map((dimension) => (
+                      <Field
+                        key={dimension}
+                        label={t(dimension)}
+                        type="number"
+                        value={sketch[dimension]}
+                        disabled={disabled}
+                        onChange={(v) =>
+                          edit((j) => {
+                            j.sketches.find((x) => x.id === sel.id)![
+                              dimension
+                            ] = Math.max(40, Math.min(3000, Number(v) || 40));
+                          })
+                        }
+                      />
+                    ))}
+                    {(["x", "y"] as const).map((axis) => (
+                      <Field
+                        key={axis}
+                        label={t(
+                          sketch.anchor
+                            ? axis === "x"
+                              ? "horizontalOffset"
+                              : "verticalOffset"
+                            : axis === "x"
+                              ? "horizontalPosition"
+                              : "verticalPosition",
+                        )}
+                        type="number"
+                        value={
+                          sketch.anchor
+                            ? sketch.anchor[axis === "x" ? "dx" : "dy"]
+                            : sketch[axis]
+                        }
+                        disabled={disabled}
+                        onChange={(v) =>
+                          edit((j) => {
+                            const item = j.sketches.find(
+                              (x) => x.id === sel.id,
+                            )!;
+                            const value = Number.isFinite(Number(v))
+                              ? Number(v)
+                              : 0;
+                            if (item.anchor)
+                              item.anchor[axis === "x" ? "dx" : "dy"] = value;
+                            else item[axis] = value;
+                          })
+                        }
+                      />
+                    ))}
                     <Select
                       label={t("pin")}
                       value={sketch.anchor?.lane || ""}

@@ -150,6 +150,15 @@ test("complete local-first journey flow with no external requests", async ({
   )!;
   expect(savedJourney.sketches[0].anchor.dx).toBeCloseTo(pinned.dx, 1);
   expect(savedJourney.sketches[0].anchor.dy).toBeCloseTo(pinned.dy, 1);
+  await page.getByLabel("Width", { exact: true }).fill("240");
+  await page.getByLabel("Width", { exact: true }).blur();
+  await expect.poll(() => sketch.evaluate((n) => n.clientWidth)).toBe(240);
+  await page.getByLabel("Horizontal offset", { exact: true }).fill("24");
+  await page.getByLabel("Horizontal offset", { exact: true }).blur();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(
+    page.getByLabel("Horizontal offset", { exact: true }),
+  ).toHaveValue("12");
   await page.keyboard.press("Escape");
   await openPalette(page, "Export");
   const jsonDownload = page.waitForEvent("download");

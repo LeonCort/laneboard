@@ -226,8 +226,10 @@ export const SketchNode = memo(function SketchNode({
     >
       <NodeResizer
         isVisible={selected && !data.readOnly}
-        minWidth={60}
+        minWidth={40}
         minHeight={40}
+        maxWidth={3000}
+        maxHeight={3000}
         onResizeEnd={(_, p) =>
           edit((j) => {
             const s = j.sketches.find((s) => s.id === data.id);
