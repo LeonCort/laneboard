@@ -2,7 +2,7 @@
 
 A local-first service blueprint canvas for seeing a banking journey across channels. Map services, customer steps, frictions, support, owners and technical capabilities. Compare now and target, then present or share a file.
 
-[Open Laneboard](https://laneboard-leoncorts-projects.vercel.app) · [Source repository](https://github.com/LeonCort/laneboard)
+[Open Laneboard](https://laneboard-tan.vercel.app) · [Source repository](https://github.com/LeonCort/laneboard)
 
 **Every journey stays in the browser.** No accounts, backend, analytics, telemetry or AI requests. Static files load from Vercel; IndexedDB stores the workspace. Installed dependencies and fonts are bundled. A service worker caches the app for offline use.
 

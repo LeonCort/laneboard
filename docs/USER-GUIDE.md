@@ -12,7 +12,7 @@ Laneboard maps a customer journey across channels. The map, services table, capa
 
 **Compare now and target.** The top-right switch changes statuses, visible steps, edge transitions, experience values, rules and KPIs. Changed service statuses receive a highlight and a “Changed” tag. In the investing example, restarts drop from two to zero. Target friction text is a recommendation, not a claim that a problem has already been resolved.
 
-**Layers and filters.** Toggle services, journey, frictions, feeds, market, owners or sketches in the inspector. Search card text and use the filters for owner, severity or lane; non-matching items are dimmed. The Owners layer outlines lanes by owner. Definitions lets you maintain shared owners and capabilities. Overview shows owners’ frictions and the silos / cross-cutting role / shared goal diagram.
+**Layers and filters.** Toggle services, journey, frictions, feeds, market, owners or sketches in the inspector. Search card text and use the filters for owner, severity or lane; non-matching items are dimmed. The Owners layer outlines lanes and frictions by owner, with owner chips to filter the map. Definitions lets you maintain shared owners and capabilities. Overview shows owners’ frictions and the silos / cross-cutting role / shared goal diagram.
 
 **Sketch.** Switch the dock to Sketch and use rectangle (R), ellipse (O), arrow (A), text (T) or sticky note (N). Place a shape, resize it with its handles and edit it in the inspector. Pin it to a lane and phase so it follows the cell, or let it float. The Sketches layer hides all annotations. Q keeps a tool active after placement. H or Space+drag pans; Ctrl/Cmd+scroll, pinch and +/− zoom. Use Fit to screen to see the whole map.
 
