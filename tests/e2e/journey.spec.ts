@@ -41,6 +41,8 @@ test("complete local-first journey flow with no external requests", async ({
   baseURL,
   browserName,
 }) => {
+  // This composite flow includes image rendering, two imports and a reload.
+  test.setTimeout(120000);
   const external: string[] = [],
     errors: string[] = [];
   page.on("request", (request) => {

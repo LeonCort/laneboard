@@ -8,6 +8,7 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
+    actionTimeout: 10000,
     baseURL: process.env.BASE_URL || "http://127.0.0.1:4177",
     viewport: { width: 1440, height: 1000 },
     trace: "retain-on-failure",
