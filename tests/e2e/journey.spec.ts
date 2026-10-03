@@ -257,18 +257,29 @@ test("mortgage example and default six-step presentation", async ({ page }) => {
 test("welcome and editor meet accessibility checks in light and dark themes", async ({
   page,
 }) => {
+  const themeReady = async (theme: string) => {
+    await page.evaluate(async (theme) => {
+      document.documentElement.dataset.theme = theme;
+      await document.fonts.ready;
+      void document.body.offsetWidth;
+      await Promise.all(
+        document.getAnimations().map((a) => a.finished.catch(() => {})),
+      );
+    }, theme);
+  };
   await page.goto("/");
-  let result = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-    .analyze();
-  expect(result.violations).toEqual([]);
+  await page.getByRole("button", { name: "Open investing example" }).waitFor();
+  for (const theme of ["light", "dark"]) {
+    await themeReady(theme);
+    const result = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(result.violations).toEqual([]);
+  }
   await page.getByRole("button", { name: "Open investing example" }).click();
   for (const theme of ["light", "dark"]) {
-    await page.evaluate(
-      (theme) => (document.documentElement.dataset.theme = theme),
-      theme,
-    );
-    result = await new AxeBuilder({ page })
+    await themeReady(theme);
+    const result = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
       .analyze();
     expect(result.violations).toEqual([]);
