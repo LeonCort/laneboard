@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readFile } from "node:fs/promises";
 import example from "../../src/examples/investing.laneboard.json" with { type: "json" };
 const openPalette = async (page: Page, action: string) => {
   await page.keyboard.press("ControlOrMeta+k");
@@ -94,6 +95,59 @@ test("complete local-first journey flow with no external requests", async ({
   await expect(page.locator(".lb-sketch")).toHaveCount(1);
   await page.getByLabel("Pin to cell").selectOption("app");
   await expect(page.locator(".lb-pin")).toHaveCount(1);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Saved in this browser" }),
+  ).toBeVisible();
+  const pinned = await page.evaluate(async () => {
+    const request = indexedDB.open("laneboard");
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      request.onsuccess = () => resolve(request.result);
+    });
+    const req = db
+      .transaction("workspaces")
+      .objectStore("workspaces")
+      .get("local");
+    return await new Promise<{ dx: number; dy: number }>((resolve) => {
+      req.onsuccess = () => {
+        const w = req.result.data;
+        resolve(
+          w.journeys.find((j: { id: string }) => j.id === w.ui.selectedJourney)
+            .sketches[0].anchor,
+        );
+      };
+    });
+  });
+  const handle = page.locator(
+    ".react-flow__resize-control.bottom.right.handle",
+  );
+  const handleBox = await handle.boundingBox();
+  const sketch = page.locator(".react-flow__node-sketch");
+  const widthBefore = await sketch.evaluate((n) => n.clientWidth);
+  expect(handleBox).not.toBeNull();
+  await page.mouse.move(
+    handleBox!.x + handleBox!.width / 2,
+    handleBox!.y + handleBox!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + 30, handleBox!.y + 25, { steps: 5 });
+  await page.mouse.up();
+  await expect
+    .poll(() => sketch.evaluate((n) => n.clientWidth))
+    .toBeGreaterThan(widthBefore);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Saved in this browser" }),
+  ).toBeVisible();
+  const resized = await readSaved(page);
+  const savedJourney = (
+    resized.journeys as {
+      id: string;
+      sketches: { anchor: { dx: number; dy: number } }[];
+    }[]
+  ).find(
+    (j) => j.id === (resized.ui as { selectedJourney: string }).selectedJourney,
+  )!;
+  expect(savedJourney.sketches[0].anchor.dx).toBeCloseTo(pinned.dx, 1);
+  expect(savedJourney.sketches[0].anchor.dy).toBeCloseTo(pinned.dy, 1);
   await page.keyboard.press("Escape");
   await openPalette(page, "Export");
   const jsonDownload = page.waitForEvent("download");
@@ -101,12 +155,24 @@ test("complete local-first journey flow with no external requests", async ({
   expect((await jsonDownload).suggestedFilename()).toBe(
     "workspace.laneboard.json",
   );
+  await page.getByLabel("Image scale").selectOption("2");
+  const mapSize = await page.locator(".react-flow").boundingBox();
   const pngDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: /^PNG/ }).click();
-  expect((await pngDownload).suggestedFilename()).toMatch(/\.png$/);
+  const png = await pngDownload;
+  expect(png.suggestedFilename()).toMatch(/\.png$/);
+  const pngBytes = await readFile((await png.path())!);
+  expect(pngBytes.readUInt32BE(16)).toBe(mapSize!.width * 2);
+  expect(pngBytes.readUInt32BE(20)).toBe(mapSize!.height * 2);
   const svgDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: /^SVG/ }).click();
-  expect((await svgDownload).suggestedFilename()).toMatch(/\.svg$/);
+  const svg = await svgDownload;
+  expect(svg.suggestedFilename()).toMatch(/\.svg$/);
+  const svgText = await readFile((await svg.path())!, "utf8");
+  expect(svgText).toContain(`width="${mapSize!.width * 2}"`);
+  expect(svgText).toContain(`height="${mapSize!.height * 2}"`);
+  expect(svgText).toContain("Surplus analysis");
+  expect(svgText).not.toContain("lb-island");
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "Saved in this browser" }),

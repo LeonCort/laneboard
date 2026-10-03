@@ -115,12 +115,21 @@ export async function exportImage(type: "png" | "svg", scale: number) {
     filter: (n: HTMLElement) =>
       !n.classList?.contains("react-flow__panel") &&
       !n.classList?.contains("react-flow__minimap") &&
-      !n.classList?.contains("lb-canvas-ui"),
+      !n.classList?.contains("lb-canvas-ui") &&
+      !n.classList?.contains("lb-island"),
   };
-  const url =
-    type === "png"
-      ? await toPng(target, options)
-      : await toSvg(target, options);
+  let url: string;
+  if (type === "png") url = await toPng(target, options);
+  else {
+    const source = await toSvg(target, options);
+    const svg = new DOMParser().parseFromString(
+      decodeURIComponent(source.slice(source.indexOf(",") + 1)),
+      "image/svg+xml",
+    ).documentElement;
+    svg.setAttribute("width", String(target.clientWidth * scale));
+    svg.setAttribute("height", String(target.clientHeight * scale));
+    url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+  }
   const a = document.createElement("a");
   a.download = `laneboard-${useStore.getState().workspace.ui.mode}.${type}`;
   a.href = url;
@@ -129,9 +138,7 @@ export async function exportImage(type: "png" | "svg", scale: number) {
 export async function saveToDisk() {
   const picker = (
     window as unknown as {
-      showSaveFilePicker?: (
-        o: unknown,
-      ) => Promise<{
+      showSaveFilePicker?: (o: unknown) => Promise<{
         createWritable: () => Promise<{
           write: (x: string) => Promise<void>;
           close: () => Promise<void>;

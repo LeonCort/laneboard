@@ -18,9 +18,9 @@ import type { Key } from "../i18n";
 export const CellNode = memo(function CellNode({
   data,
 }: NodeProps<Node<CellData>>) {
-  const store = useStore(),
-    ownerIndex =
-      store.workspace.owners.findIndex((o) => o.id === data.ownerIndex) + 1;
+  const ownerIndex = useStore(
+    (s) => s.workspace.owners.findIndex((o) => o.id === data.ownerIndex) + 1,
+  );
   return (
     <div
       className="lb-cell lb-cell-node"
@@ -41,6 +41,7 @@ export const CardNode = memo(function CardNode({
   selected,
 }: NodeProps<Node<CardData>>) {
   const t = useT(),
+    owners = useStore((s) => s.workspace.owners),
     edit = useStore((s) => s.editJourney),
     [editing, setEditing] = useState(false),
     [text, setText] = useState(data.text);
@@ -74,6 +75,8 @@ export const CardNode = memo(function CardNode({
       data-kind={data.feedKind}
       data-dimmed={data.dimmed}
       data-selected={selected}
+      data-owned={data.showOwner}
+      data-owner-index={owners.findIndex((o) => o.id === data.owner) + 1}
     >
       <Handle
         type="target"
@@ -135,7 +138,7 @@ export const CardNode = memo(function CardNode({
         ) : null}
         {data.feedKind ? (
           <span className="lb-card__kind">
-            {data.feedKind === "entry" ? "Entry" : "Support"}
+            {data.feedKind === "entry" ? t("entryLabel") : t("supportLabel")}
           </span>
         ) : null}
         {data.assumption ? (
@@ -152,6 +155,7 @@ export const CardNode = memo(function CardNode({
   );
 });
 export const JourneyEdge = memo(function JourneyEdge(props: EdgeProps) {
+  const t = useT();
   const transition = String(props.data?.transition || "channel-switch");
   const [path, x, y] = getSmoothStepPath({
     ...props,
@@ -174,7 +178,7 @@ export const JourneyEdge = memo(function JourneyEdge(props: EdgeProps) {
               transform: `translate(-50%, -50%) translate(${x}px,${y}px)`,
             }}
           >
-            Restart
+            {t("restarts")}
           </span>
         </EdgeLabelRenderer>
       ) : null}
@@ -214,7 +218,7 @@ export const SketchNode = memo(function SketchNode({
       );
     }
   }, [kind, width, height]);
-  const store = useStore();
+  const edit = useStore((s) => s.editJourney);
   return (
     <div
       className={kind === "note" ? "lb-note" : "lb-sketch-wrap"}
@@ -225,14 +229,14 @@ export const SketchNode = memo(function SketchNode({
         minWidth={60}
         minHeight={40}
         onResizeEnd={(_, p) =>
-          store.editJourney((j) => {
+          edit((j) => {
             const s = j.sketches.find((s) => s.id === data.id);
             if (s) {
               s.width = p.width;
               s.height = p.height;
               if (s.anchor) {
-                const dx = p.x - s.x,
-                  dy = p.y - s.y;
+                const dx = p.x - Number(data.renderX),
+                  dy = p.y - Number(data.renderY);
                 s.anchor.dx += dx;
                 s.anchor.dy += dy;
               }
@@ -260,7 +264,7 @@ export const SketchNode = memo(function SketchNode({
   );
 });
 export const CurveNode = memo(function CurveNode({ data }: NodeProps) {
-  const store = useStore(),
+  const edit = useStore((s) => s.editJourney),
     t = useT(),
     columns = data.columns as { x: number; width: number; id: string }[],
     mode = data.mode as "now" | "target",
@@ -308,7 +312,7 @@ export const CurveNode = memo(function CurveNode({ data }: NodeProps) {
                       ),
                     ) * 10,
                   ) / 10;
-                store.editJourney((j) => {
+                edit((j) => {
                   j.experience[mode][i] = value;
                 });
               };

@@ -44,6 +44,7 @@ export function Modal({
   children: ReactNode;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <Dialog.Root
       open
@@ -66,7 +67,7 @@ export function Modal({
             </Dialog.Close>
           </div>
           <Dialog.Description className="lb-field__hint">
-            {description || "Laneboard · stored on your device"}
+            {description || t("localDefault")}
           </Dialog.Description>
           <div className="lb-dialog-body">{children}</div>
         </Dialog.Content>
@@ -190,7 +191,7 @@ export function ImportDialog({
             </details>
           ) : null}
           <Select
-            label="Import method"
+            label={t("importMethod")}
             value={replace ? "replace" : "add"}
             onChange={(v) => setReplace(v === "replace")}
           >
@@ -316,7 +317,7 @@ export function ExportDialog({
           <span>CSV</span>
         </button>
       </div>
-      <Select label="Image scale" value={scale} onChange={setScale}>
+      <Select label={t("imageScale")} value={scale} onChange={setScale}>
         <option value="1">1×</option>
         <option value="2">2×</option>
       </Select>
@@ -331,7 +332,7 @@ export function ExportDialog({
         <Download size={16} />
         Save workspace to file
       </button>
-      {busy ? <p role="status">Rendering locally…</p> : null}
+      {busy ? <p role="status">{t("renderLocal")}</p> : null}
     </Modal>
   );
 }
@@ -382,7 +383,12 @@ export function AIDialog({
         {t("copyPrompt")}
       </button>
       {prompt ? (
-        <Field label="Prompt" value={prompt} onChange={setPrompt} multiline />
+        <Field
+          label={t("prompt")}
+          value={prompt}
+          onChange={setPrompt}
+          multiline
+        />
       ) : null}
     </Modal>
   );
@@ -433,9 +439,9 @@ export function SettingsDialog({
           })
         }
       >
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
+        <option value="system">{t("system")}</option>
+        <option value="light">{t("light")}</option>
+        <option value="dark">{t("dark")}</option>
       </Select>
       <Select
         label={t("accent")}
@@ -446,9 +452,9 @@ export function SettingsDialog({
           })
         }
       >
-        <option value="blue">Blue</option>
-        <option value="teal">Teal</option>
-        <option value="purple">Purple</option>
+        <option value="blue">{t("blue")}</option>
+        <option value="teal">{t("teal")}</option>
+        <option value="purple">{t("purple")}</option>
       </Select>
       <label className="lb-field">
         <span className="lb-field__label">{t("logo")}</span>
@@ -692,7 +698,7 @@ export function Palette({
   return (
     <Modal title={t("openPalette")} onClose={onClose}>
       <Command className="lb-cmdk" label={t("openPalette")}>
-        <Command.Input placeholder="Search actions…" />
+        <Command.Input placeholder={t("searchActions")} />
         <Command.List>
           <Command.Empty>{t("noResults")}</Command.Empty>
           {actions.map((a) => (

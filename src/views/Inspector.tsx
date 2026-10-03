@@ -32,8 +32,12 @@ import {
 } from "../model/schema";
 export function Inspector({
   confirm,
+  ownerFilter = "",
+  onOwnerFilter,
 }: {
   confirm: (title: string, fn: () => void) => void;
+  ownerFilter?: string;
+  onOwnerFilter?: (id: string) => void;
 }) {
   const s = useStore(),
     t = useT(),
@@ -158,7 +162,7 @@ export function Inspector({
                   multiline
                 />
                 <Field
-                  label="Segment"
+                  label={t("segment")}
                   value={j.segment}
                   onChange={(v) =>
                     edit((j) => {
@@ -208,6 +212,26 @@ export function Inspector({
               ))}
             </div>
           </section>
+          {s.workspace.ui.layers.includes("owners") ? (
+            <section className="lb-inspector__section">
+              <span className="lb-inspector__label">{t("owners")}</span>
+              <div className="lb-chips">
+                {s.workspace.owners.map((o, i) => (
+                  <button
+                    className="lb-chip"
+                    key={o.id}
+                    data-owner-index={(i % 6) + 1}
+                    aria-pressed={ownerFilter === o.id}
+                    onClick={() =>
+                      onOwnerFilter?.(ownerFilter === o.id ? "" : o.id)
+                    }
+                  >
+                    <span className="lb-owner-tag">{o.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <section className="lb-inspector__section">
             <div className="lb-stats">
               {(
@@ -478,7 +502,7 @@ export function Inspector({
                 return (
                   <>
                     <Field
-                      label="Target text"
+                      label={t("targetText")}
                       value={step.textTarget || ""}
                       onChange={(v) =>
                         edit((j) => {
@@ -499,7 +523,7 @@ export function Inspector({
                         })
                       }
                     >
-                      <option value="both">Both</option>
+                      <option value="both">{t("both")}</option>
                       <option value="now">{t("now")}</option>
                       <option value="target">{t("target")}</option>
                     </Select>
@@ -588,7 +612,7 @@ export function Inspector({
                 return (
                   <>
                     <Select
-                      label="Feed kind"
+                      label={t("feedKind")}
                       value={feed.kind}
                       onChange={(v) =>
                         edit((j) => {
@@ -598,11 +622,11 @@ export function Inspector({
                       }
                       disabled={disabled}
                     >
-                      <option value="entry">Entry</option>
-                      <option value="support">Support</option>
+                      <option value="entry">{t("entryLabel")}</option>
+                      <option value="support">{t("supportLabel")}</option>
                     </Select>
                     <Select
-                      label="Informs step"
+                      label={t("informsStep")}
                       value={feed.to}
                       onChange={(v) =>
                         edit((j) => {
@@ -618,7 +642,7 @@ export function Inspector({
                       ))}
                     </Select>
                     <Field
-                      label="Explanation"
+                      label={t("explanation")}
                       value={feed.explanation}
                       onChange={(v) =>
                         edit((j) => {
@@ -638,7 +662,7 @@ export function Inspector({
                 return (
                   <>
                     <Field
-                      label="Subtitle"
+                      label={t("subtitle")}
                       value={l.sub}
                       disabled={disabled}
                       onChange={(v) =>
@@ -648,7 +672,7 @@ export function Inspector({
                       }
                     />
                     <Select
-                      label="Lane kind"
+                      label={t("laneKind")}
                       value={l.kind}
                       disabled={disabled}
                       onChange={(v) =>
@@ -684,7 +708,7 @@ export function Inspector({
                       ))}
                     </Select>
                     <Select
-                      label="Lane group"
+                      label={t("laneGroup")}
                       value={l.group || ""}
                       disabled={disabled}
                       onChange={(v) =>
@@ -694,7 +718,7 @@ export function Inspector({
                         })
                       }
                     >
-                      <option value="">Ungrouped</option>
+                      <option value="">{t("ungrouped")}</option>
                       {j.laneGroups.map((g) => (
                         <option key={g.id} value={g.id}>
                           {g.name}
@@ -702,7 +726,7 @@ export function Inspector({
                       ))}
                     </Select>
                     <Select
-                      label="Tint"
+                      label={t("tint")}
                       value={l.tint || l.group || l.kind}
                       disabled={disabled}
                       onChange={(v) =>
@@ -726,7 +750,7 @@ export function Inspector({
                     {l.kind === "channel" ? (
                       <>
                         <Select
-                          label="Channel type"
+                          label={t("channelType")}
                           value={l.channel?.type || "digital"}
                           disabled={disabled}
                           onChange={(v) =>
@@ -747,13 +771,13 @@ export function Inspector({
                             })
                           }
                         >
-                          <option value="digital">Digital</option>
-                          <option value="assisted">Assisted</option>
+                          <option value="digital">{t("digital")}</option>
+                          <option value="assisted">{t("assisted")}</option>
                         </Select>
                         {l.channel?.type === "digital" ? (
                           <>
                             <Check
-                              label="Authenticated"
+                              label={t("authenticated")}
                               checked={l.channel.authenticated}
                               disabled={disabled}
                               onChange={(v) =>
@@ -767,7 +791,7 @@ export function Inspector({
                               }
                             />
                             <Check
-                              label="Webview host"
+                              label={t("webviewHost")}
                               checked={l.channel.webviewHost}
                               disabled={disabled}
                               onChange={(v) =>
@@ -810,7 +834,7 @@ export function Inspector({
           {sel.kind === "phase" ? (
             <>
               <Field
-                label="Width"
+                label={t("width")}
                 value={j.phases.find((x) => x.id === sel.id)!.width}
                 type="number"
                 disabled={disabled}
@@ -863,7 +887,7 @@ export function Inspector({
                 return (
                   <>
                     <Select
-                      label="Line after group"
+                      label={t("lineAfter")}
                       value={g.lineAfter?.kind || ""}
                       disabled={disabled}
                       onChange={(v) =>
@@ -882,12 +906,12 @@ export function Inspector({
                       }
                     >
                       <option value="">None</option>
-                      <option value="boundary">Self-service boundary</option>
-                      <option value="visibility">Line of visibility</option>
+                      <option value="boundary">{t("boundary")}</option>
+                      <option value="visibility">{t("visibilityLine")}</option>
                     </Select>
                     {g.lineAfter ? (
                       <Field
-                        label="Line label"
+                        label={t("lineLabel")}
                         value={g.lineAfter.label}
                         disabled={disabled}
                         onChange={(v) =>
@@ -937,7 +961,7 @@ export function Inspector({
                 return (
                   <>
                     <Select
-                      label="Shape"
+                      label={t("shape")}
                       value={sketch.kind}
                       disabled={disabled}
                       onChange={(v) =>

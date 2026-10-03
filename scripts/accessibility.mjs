@@ -5,7 +5,7 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
 });
 const page = await context.newPage();
-await page.goto("http://127.0.0.1:4177");
+await page.goto(process.env.BASE_URL || "http://127.0.0.1:4177");
 await page.getByRole("button", { name: "Open investing example" }).click();
 for (const theme of ["light", "dark"]) {
   await page.evaluate(

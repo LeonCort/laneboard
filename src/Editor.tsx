@@ -86,7 +86,7 @@ import { Inspector } from "./views/Inspector";
 import { Drawer, type Tab } from "./views/Drawer";
 import { presentationFor } from "./present";
 import { layers, newId, type Layer } from "./model/schema";
-import { exportJSON, exportImage } from "./io/export";
+import { exportJSON, exportImage, exportCSV } from "./io/export";
 import {
   Modal,
   ImportDialog,
@@ -104,21 +104,21 @@ import {
 } from "./ui/dialogs";
 import "./styles/editor.css";
 const toolSpec = [
-  { id: "select", key: "V", icon: MousePointer2, label: "Select" },
-  { id: "hand", key: "H", icon: Hand, label: "Pan" },
-  { id: "service", key: "S", icon: Square, label: "Service" },
-  { id: "step", key: "J", icon: Route, label: "Journey step" },
-  { id: "friction", key: "F", icon: TriangleAlert, label: "Friction" },
-  { id: "feed", key: "E", icon: ArrowRightToLine, label: "Feed" },
-  { id: "note", key: "N", icon: StickyNote, label: "Note" },
+  { id: "select", key: "V", icon: MousePointer2, label: "toolSelect" },
+  { id: "hand", key: "H", icon: Hand, label: "toolPan" },
+  { id: "service", key: "S", icon: Square, label: "toolService" },
+  { id: "step", key: "J", icon: Route, label: "toolStep" },
+  { id: "friction", key: "F", icon: TriangleAlert, label: "toolFriction" },
+  { id: "feed", key: "E", icon: ArrowRightToLine, label: "toolFeed" },
+  { id: "note", key: "N", icon: StickyNote, label: "toolNote" },
 ];
 const sketchSpec = [
   ...toolSpec.slice(0, 2),
-  { id: "rectangle", key: "R", icon: Square, label: "Rectangle" },
-  { id: "ellipse", key: "O", icon: Circle, label: "Ellipse" },
-  { id: "arrow", key: "A", icon: ArrowUpRight, label: "Arrow" },
-  { id: "text", key: "T", icon: Type, label: "Text" },
-  { id: "note", key: "N", icon: StickyNote, label: "Sticky note" },
+  { id: "rectangle", key: "R", icon: Square, label: "toolRectangle" },
+  { id: "ellipse", key: "O", icon: Circle, label: "toolEllipse" },
+  { id: "arrow", key: "A", icon: ArrowUpRight, label: "toolArrow" },
+  { id: "text", key: "T", icon: Type, label: "toolText" },
+  { id: "note", key: "N", icon: StickyNote, label: "toolSticky" },
 ];
 const duration = { duration: 180 };
 export default function Editor() {
@@ -212,16 +212,17 @@ function EditorInner() {
     root.dataset.accent = settings.accent;
     root.lang = settings.language;
   }, [s.workspace.settings]);
+  const journeyId = j?.id;
   useEffect(() => {
-    if (j) {
-      const v = s.workspace.ui.viewport;
-      flow.setViewport(v || { x: collapsed ? 200 : 450, y: 140, zoom: 0.68 });
+    if (journeyId) {
+      const v = useStore.getState().workspace.ui.viewport;
+      flow.setViewport(v || { x: 450, y: 140, zoom: 0.68 });
     }
     setSearch("");
     setOwner("");
     setSeverity("");
     setLaneFilter("");
-  }, [j?.id]);
+  }, [journeyId, flow]);
   const readFile = async (file?: File) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -281,6 +282,14 @@ function EditorInner() {
     if (originalPresent.current)
       flow.setViewport(originalPresent.current.viewport, duration);
   }, [flow]);
+  useEffect(() => {
+    if (present === null) return;
+    const changed = () => {
+      if (!document.fullscreenElement) finishPresent();
+    };
+    document.addEventListener("fullscreenchange", changed);
+    return () => document.removeEventListener("fullscreenchange", changed);
+  }, [present, finishPresent]);
   const startPresent = () => {
     if (!j) return;
     originalPresent.current = {
@@ -310,7 +319,7 @@ function EditorInner() {
             duration: 200,
           }),
       );
-  }, [present, j?.id]);
+  }, [present, graph, slide, flow]);
   const defaultCell = () => {
     const sel = s.selection;
     return {
@@ -357,7 +366,7 @@ function EditorInner() {
       );
       s.select({ kind: "sketch", id });
     } else if (kind === "feed" && !j.steps.length) {
-      notify("Add a journey step before a feed.");
+      notify(t("noFeedStep"));
       return;
     } else addCard(kind as Selection["kind"], cell.lane, cell.phase, position);
     if (!keepTool) setTool("select");
@@ -467,6 +476,20 @@ function EditorInner() {
       label: "Export SVG",
       run: () => void exportImage("svg", 1).catch((e) => notify(e.message)),
     },
+    {
+      id: "csv-services",
+      label: `${t("export")} ${t("services")} CSV`,
+      run: () => {
+        if (j) exportCSV("services", j, s.workspace.ui.mode);
+      },
+    },
+    {
+      id: "csv-frictions",
+      label: `${t("export")} ${t("frictions")} CSV`,
+      run: () => {
+        if (j) exportCSV("frictions", j, s.workspace.ui.mode);
+      },
+    },
     { id: "ai", label: t("ai"), run: () => setDialog("ai") },
     { id: "settings", label: t("settings"), run: () => setDialog("settings") },
     {
@@ -509,18 +532,18 @@ function EditorInner() {
     { id: "addlane", label: t("addLane"), run: addLane },
     { id: "addphase", label: t("addPhase"), run: addPhase },
     { id: "addgroup", label: t("addGroup"), run: addGroup },
-    { id: "copy", label: "Copy selected cards", run: copyCards },
+    { id: "copy", label: t("copySelected"), run: copyCards },
     {
       id: "paste",
-      label: "Paste cards",
+      label: t("pasteCards"),
       run: () => void pasteCards().catch((e) => notify(e.message)),
     },
     {
       id: "duplicate-cards",
-      label: "Duplicate selected cards",
+      label: t("duplicateSelected"),
       run: duplicateCards,
     },
-    { id: "delete-card", label: "Delete selected cards", run: deleteSelection },
+    { id: "delete-card", label: t("deleteSelected"), run: deleteSelection },
     ...(["service", "step", "friction", "feed", "note"] as const).map(
       (kind) => ({
         id: `add-${kind}`,
@@ -1003,7 +1026,10 @@ function EditorInner() {
             )}
           </span>
           <Menu.Root>
-            <Menu.Trigger className="lb-iconbtn" aria-label="Workspace menu">
+            <Menu.Trigger
+              className="lb-iconbtn"
+              aria-label={t("workspaceMenu")}
+            >
               <ChevronDown />
             </Menu.Trigger>
             <Menu.Portal>
@@ -1017,11 +1043,11 @@ function EditorInner() {
                   { label: t("toggleUI"), run: () => setCollapsed((v) => !v) },
                 ].map((a) => (
                   <Menu.Item
-                    key={a.label}
+                    key={t(a.label)}
                     className="lb-menu__item"
                     onSelect={a.run}
                   >
-                    {a.label}
+                    {t(a.label)}
                   </Menu.Item>
                 ))}
               </Menu.Content>
@@ -1138,14 +1164,14 @@ function EditorInner() {
                             onClick={() => place(a.id)}
                           >
                             <a.icon size={18} />
-                            {a.label}
+                            {t(a.label)}
                             <kbd className="lb-kbd">{a.key}</kbd>
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="lb-section">
-                      <div className="lb-section__head">Structure</div>
+                      <div className="lb-section__head">{t("structure")}</div>
                       <button
                         className="lb-menu__item"
                         onClick={addLane}
@@ -1172,7 +1198,7 @@ function EditorInner() {
                       </button>
                     </div>
                     <div className="lb-section">
-                      <div className="lb-section__head">Templates</div>
+                      <div className="lb-section__head">{t("templates")}</div>
                       <button
                         className="lb-menu__item"
                         onClick={() => s.newJourney("bank")}
@@ -1502,7 +1528,13 @@ function EditorInner() {
                 )}
               </aside>
             ) : null}
-            {j ? <Inspector confirm={confirm} /> : null}
+            {j ? (
+              <Inspector
+                confirm={confirm}
+                ownerFilter={owner}
+                onOwnerFilter={setOwner}
+              />
+            ) : null}
           </>
         ) : null}
         {j && present === null && !collapsed ? (
@@ -1516,7 +1548,7 @@ function EditorInner() {
             </div>
             <button
               className="lb-iconbtn"
-              aria-label="Edit journey"
+              aria-label={t("editJourney")}
               onClick={() => s.select({ kind: "journey", id: j.id })}
             >
               <MoreHorizontal />
@@ -1606,8 +1638,8 @@ function EditorInner() {
                 <button
                   key={a.id}
                   className="lb-tool"
-                  title={`${a.label} (${a.key})`}
-                  aria-label={`${a.label} tool`}
+                  title={`${t(a.label)} (${a.key})`}
+                  aria-label={`${t(a.label)} tool`}
                   aria-pressed={tool === a.id}
                   onClick={() => setTool(a.id)}
                 >
@@ -1653,7 +1685,7 @@ function EditorInner() {
             <Panel position="bottom-left" className="lb-island lb-zoombar">
               <button
                 className="lb-tool"
-                aria-label="Zoom out"
+                aria-label={t("zoomOut")}
                 onClick={() => void flow.zoomOut()}
               >
                 <Minus />
@@ -1666,7 +1698,7 @@ function EditorInner() {
               </button>
               <button
                 className="lb-tool"
-                aria-label="Zoom in"
+                aria-label={t("zoomIn")}
                 onClick={() => void flow.zoomIn()}
               >
                 <Plus />
@@ -1724,7 +1756,7 @@ function EditorInner() {
               <button
                 className="lb-btn lb-btn--icon"
                 disabled={present === 0}
-                aria-label="Previous slide"
+                aria-label={t("previousSlide")}
                 onClick={() => setPresent((p) => Math.max(0, (p || 0) - 1))}
               >
                 <ChevronLeft />
@@ -1732,7 +1764,7 @@ function EditorInner() {
               <button
                 className="lb-btn lb-btn--icon"
                 disabled={present === sequence.length - 1}
-                aria-label="Next slide"
+                aria-label={t("nextSlide")}
                 onClick={() =>
                   setPresent((p) => Math.min(sequence.length - 1, (p || 0) + 1))
                 }
@@ -1836,12 +1868,12 @@ function EditorInner() {
         </div>
       ) : null}
       {picker ? (
-        <Modal title="Add a card" onClose={() => setPicker(null)}>
+        <Modal title={t("placeCard")} onClose={() => setPicker(null)}>
           <div className="lb-picker">
             {toolSpec.slice(2).map((a) => (
               <button key={a.id} onClick={() => place(a.id, picker)}>
                 <a.icon size={20} />
-                {a.label}
+                {t(a.label)}
               </button>
             ))}
           </div>

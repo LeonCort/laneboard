@@ -373,7 +373,7 @@ export function Drawer({
                 <th>
                   {t("notes")} · {t(mode)}
                 </th>
-                <th>Order</th>
+                <th>{t("order")}</th>
               </tr>
             </thead>
             <tbody>
@@ -512,10 +512,10 @@ export function Drawer({
                     {label}
                     <span>
                       {diagram === 0
-                        ? "Local objectives"
+                        ? t("localObjectives")
                         : diagram === 1
-                          ? "Connected by the experience function"
-                          : j.goal || "One customer journey"}
+                          ? t("connectedFunction")
+                          : j.goal || t("oneJourneyLabel")}
                     </span>
                   </div>
                 ))}
@@ -523,7 +523,7 @@ export function Drawer({
               {diagram > 0 ? (
                 <div className="lb-cross-cutting">
                   {diagram === 1
-                    ? "Customer experience function"
+                    ? t("experienceFunction")
                     : j.goal || t("sharedGoal")}
                 </div>
               ) : null}

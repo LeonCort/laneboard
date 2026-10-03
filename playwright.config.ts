@@ -35,6 +35,26 @@ export default defineConfig({
         viewport: { width: 1440, height: 1000 },
       },
     },
+    ...(process.env.RELEASE_BROWSERS
+      ? [
+          {
+            name: "chrome",
+            use: {
+              ...devices["Desktop Chrome"],
+              channel: "chrome",
+              viewport: { width: 1440, height: 1000 },
+            },
+          },
+          {
+            name: "edge",
+            use: {
+              ...devices["Desktop Edge"],
+              channel: "msedge",
+              viewport: { width: 1440, height: 1000 },
+            },
+          },
+        ]
+      : []),
   ],
   webServer: process.env.BASE_URL
     ? undefined

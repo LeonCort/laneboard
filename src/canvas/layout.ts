@@ -142,6 +142,7 @@ export function layout(
             text: f.title,
             meta: mode === "target" ? f.recommendation : f.now,
             owner: f.owner,
+            showOwner: active.has("owners"),
             assumption: f.assumption,
             dimmed:
               dimmed ||
@@ -192,7 +193,11 @@ export function layout(
   });
   let y = 0,
     lastGroup: string | null = null;
-  for (const l of j.lanes) {
+  const orderedLanes = [
+    ...j.lanes.filter((l) => l.group === null),
+    ...j.laneGroups.flatMap((g) => j.lanes.filter((l) => l.group === g.id)),
+  ];
+  for (const l of orderedLanes) {
     if (l.hidden || (l.kind === "market" && !active.has("market"))) continue;
     if (l.group !== lastGroup) {
       const previous = j.laneGroups.find((g) => g.id === lastGroup);
@@ -294,7 +299,7 @@ export function layout(
       }
     }
     y += rowHeight + 10;
-    if (l.kind === "customer") {
+    if (l.kind === "customer" && !rows.some((r) => r.kind === "curve")) {
       rows.push({
         id: "curve",
         y,
@@ -369,17 +374,23 @@ export function layout(
           )
         : undefined;
       if (s.anchor && !cell) continue;
+      const position =
+        cell && s.anchor
+          ? {
+              x: cell.position.x + s.anchor.dx,
+              y: cell.position.y + s.anchor.dy,
+            }
+          : { x: s.x, y: s.y };
       nodes.push({
         id: `sketch-${s.id}`,
         type: "sketch",
-        position:
-          cell && s.anchor
-            ? {
-                x: cell.position.x + s.anchor.dx,
-                y: cell.position.y + s.anchor.dy,
-              }
-            : { x: s.x, y: s.y },
-        data: { ...s, readOnly: j.readOnly },
+        position,
+        data: {
+          ...s,
+          renderX: position.x,
+          renderY: position.y,
+          readOnly: j.readOnly,
+        },
         style: { width: s.width, height: s.height },
         selected: selection?.kind === "sketch" && selection.id === s.id,
         draggable: !j.readOnly,
