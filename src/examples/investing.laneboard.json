@@ -1,0 +1,607 @@
+{
+  "format": "laneboard",
+  "schemaVersion": 1,
+  "exportedAt": "2026-10-04T00:00:00Z",
+  "owners": [
+    {
+      "id": "strategy",
+      "name": "Channel strategy",
+      "description": "Target picture for channels and entry points, the self-service boundary and how transitions work."
+    },
+    {
+      "id": "tech",
+      "name": "Technology & architecture",
+      "description": "Requirements for webviews, session handover and context sharing, and how support functions plug in."
+    },
+    {
+      "id": "insight",
+      "name": "Customer insight",
+      "description": "How customers move within and between channels, directly and via third parties, measured against the goal."
+    },
+    {
+      "id": "market",
+      "name": "Market watch",
+      "description": "How competitors, niche banks and global players solve the same problem."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "session-handover",
+      "name": "Session handover",
+      "description": "The customer switches channel without logging in again."
+    },
+    {
+      "id": "deep-linking",
+      "name": "Deep linking",
+      "description": "Links land on the right step in the right channel, not the start page."
+    },
+    {
+      "id": "context-sharing",
+      "name": "Context sharing",
+      "description": "Data and task state follow the customer between channels, systems and staff."
+    },
+    {
+      "id": "webview",
+      "name": "Webview",
+      "description": "Web content inside the native app. Fits isolated tasks; cannot follow links in a longer flow."
+    },
+    {
+      "id": "next-best-action",
+      "name": "Next best action",
+      "description": "The right offer or next step based on the customer's situation."
+    }
+  ],
+  "journeys": [
+    {
+      "id": "sme-investing",
+      "title": "Small business owner starts investing",
+      "segment": "Business",
+      "goal": "More small businesses invest their surplus",
+      "description": "A small business owner with surplus cash explores what it could do, gets a proposal for monthly fund saving and starts investing.",
+      "phases": [
+        { "id": "need", "name": "Need arises" },
+        { "id": "explore", "name": "Explore & compare" },
+        { "id": "start", "name": "Apply & get started" },
+        { "id": "use", "name": "Use & manage" },
+        { "id": "help", "name": "Get help" },
+        { "id": "deepen", "name": "Deepen the relationship" }
+      ],
+      "laneGroups": [
+        { "id": "entry", "name": "Entry points" },
+        {
+          "id": "self",
+          "name": "Self-service",
+          "lineAfter": {
+            "kind": "boundary",
+            "label": "Self-service boundary: a person takes over here"
+          }
+        },
+        {
+          "id": "assisted",
+          "name": "Assisted",
+          "lineAfter": {
+            "kind": "visibility",
+            "label": "Line of visibility: the customer does not see below"
+          }
+        },
+        { "id": "backstage", "name": "Backstage" },
+        { "id": "market", "name": "Market" }
+      ],
+      "lanes": [
+        {
+          "id": "customer",
+          "group": null,
+          "kind": "customer",
+          "name": "Customer",
+          "sub": "What the customer does and wants",
+          "owner": "insight"
+        },
+        {
+          "id": "other-products",
+          "group": "entry",
+          "kind": "entry",
+          "name": "Other products",
+          "sub": "Signals from other products and services",
+          "owner": "strategy"
+        },
+        {
+          "id": "third-parties",
+          "group": "entry",
+          "kind": "entry",
+          "name": "Third parties",
+          "sub": "Aggregators, partners, power of attorney",
+          "owner": "insight"
+        },
+        {
+          "id": "web",
+          "group": "self",
+          "kind": "channel",
+          "name": "Public website",
+          "sub": "Not logged in",
+          "channel": {
+            "type": "digital",
+            "authenticated": false,
+            "webviewHost": false
+          }
+        },
+        {
+          "id": "app",
+          "group": "self",
+          "kind": "channel",
+          "name": "Mobile app",
+          "sub": "Private and business",
+          "channel": {
+            "type": "digital",
+            "authenticated": true,
+            "webviewHost": true
+          }
+        },
+        {
+          "id": "netbank",
+          "group": "self",
+          "kind": "channel",
+          "name": "Internet bank",
+          "sub": "Logged-in web",
+          "channel": {
+            "type": "digital",
+            "authenticated": true,
+            "webviewHost": false
+          }
+        },
+        {
+          "id": "support",
+          "group": "assisted",
+          "kind": "channel",
+          "name": "Customer service",
+          "sub": "Support by phone and chat",
+          "channel": { "type": "assisted" }
+        },
+        {
+          "id": "advisor",
+          "group": "assisted",
+          "kind": "channel",
+          "name": "Advisor",
+          "sub": "Advice at the branch or by phone",
+          "channel": { "type": "assisted" }
+        },
+        {
+          "id": "enablers",
+          "group": "backstage",
+          "kind": "backstage",
+          "name": "Enablers",
+          "sub": "Technology and architecture",
+          "owner": "tech"
+        },
+        {
+          "id": "support-functions",
+          "group": "backstage",
+          "kind": "backstage",
+          "name": "Support functions",
+          "sub": "Inform the journey",
+          "owner": "tech"
+        },
+        {
+          "id": "insight",
+          "group": "backstage",
+          "kind": "backstage",
+          "name": "Insight",
+          "sub": "Measurement and follow-up",
+          "owner": "insight"
+        },
+        {
+          "id": "competitors",
+          "group": "market",
+          "kind": "market",
+          "name": "How others solve it",
+          "sub": "Patterns to verify",
+          "owner": "market",
+          "assumption": true
+        }
+      ],
+      "cells": {
+        "customer": [
+          "The business has money left on the account",
+          "Wants to understand what the surplus could do",
+          "Wants to start saving in funds",
+          "Saves and follows the investment",
+          "Unsure about risk, tax and rules",
+          "Wants to plan liquidity and buffer long term"
+        ],
+        "other-products": [
+          "Balance grows on the business account",
+          "Notice about interest on the account",
+          "Existing business account and signatory",
+          "Year-end and quarterly reports",
+          "Tax statement and VAT",
+          "Occupational pension for the owner"
+        ],
+        "third-parties": [
+          "Accounting software shows liquidity via API",
+          "Accountant gives advice",
+          "Accountant with power of attorney helps",
+          "Bookkeeping fetches fund holdings",
+          "Accountant acts by power of attorney",
+          "Auditor's recommendations"
+        ],
+        "web": [
+          "Articles about business saving",
+          "Describes the tools and links to login",
+          "Information about fund accounts for businesses",
+          "",
+          "Help pages about funds for businesses",
+          "Guides on liquidity planning"
+        ],
+        "app": [
+          "Daily overview of the business account",
+          "",
+          "",
+          "",
+          "Chat and self-help",
+          ""
+        ],
+        "netbank": ["", "", "", "", "Secure messages", ""],
+        "support": [
+          "",
+          "Answers questions about the tools",
+          "Helps with the fund account",
+          "",
+          "Questions about risk and tax",
+          "Picks up signals about new needs"
+        ],
+        "advisor": [
+          "",
+          "",
+          "",
+          "Business advisor at the branch",
+          "Takes complex questions",
+          "Whole picture: liquidity, buffer, pension"
+        ],
+        "enablers": [
+          "Account data feeds the analysis",
+          "Analysis data is not shared between web and app",
+          "Webview for the fund account, an isolated task",
+          "Fund trading built for app and web",
+          "Context sharing to customer service",
+          "Lead routing to business advisors"
+        ],
+        "support-functions": [
+          "Deposit pricing",
+          "Fund range and sustainability data",
+          "KYC and signing authority",
+          "Fund and securities platform",
+          "Suitability assessment and compliance",
+          "CRM and the company's relationship"
+        ],
+        "insight": [
+          "How many businesses have a surplus?",
+          "Tool use per channel",
+          "Drop-off between analysis and fund account",
+          "Share saving monthly",
+          "Contact reasons about funds",
+          "Share of small businesses investing"
+        ],
+        "competitors": [
+          "Surplus suggested directly in the account overview",
+          "Analysis and investment proposal in one flow",
+          "Fund account opened in a few taps in the app",
+          "One trading capability, same experience in every channel",
+          "Support and advisors see the customer's analysis",
+          "Liquidity planning as an ongoing service"
+        ]
+      },
+      "services": [
+        {
+          "id": "surplus-analysis",
+          "name": "Surplus analysis",
+          "phase": "need",
+          "description": "Shows how much of the business balance is surplus over a buffer.",
+          "isolated": true,
+          "linksTo": [],
+          "capabilities": [],
+          "status": {
+            "now": { "web": "info", "app": "missing", "netbank": "native" },
+            "target": { "web": "info", "app": "native", "netbank": "native" }
+          }
+        },
+        {
+          "id": "inflation-tool",
+          "name": "Inflation tool",
+          "phase": "explore",
+          "description": "Shows what inflation does to cash left on the account over time.",
+          "isolated": false,
+          "linksTo": ["savings-guide"],
+          "capabilities": [],
+          "status": {
+            "now": { "web": "info", "app": "missing", "netbank": "native" },
+            "target": { "web": "info", "app": "native", "netbank": "native" }
+          }
+        },
+        {
+          "id": "savings-guide",
+          "name": "Savings guide",
+          "phase": "explore",
+          "description": "Helps the customer understand their risk appetite, sets a reasonable amount and proposes an active monthly saving in a fund, based on the customer's answers and context.",
+          "isolated": false,
+          "linksTo": ["fund-account"],
+          "capabilities": ["next-best-action"],
+          "status": {
+            "now": { "web": "info", "app": "native", "netbank": "missing" },
+            "target": { "web": "info", "app": "native", "netbank": "native" }
+          }
+        },
+        {
+          "id": "fund-account",
+          "name": "Open fund account or ISK",
+          "phase": "start",
+          "description": "A separate task needed before a monthly fund saving can start. The savings guide normally links here.",
+          "isolated": true,
+          "linksTo": [],
+          "capabilities": [],
+          "status": {
+            "now": { "web": "info", "app": "webview", "netbank": "native" },
+            "target": { "web": "info", "app": "native", "netbank": "native" }
+          }
+        },
+        {
+          "id": "fund-trading",
+          "name": "Fund trading",
+          "phase": "use",
+          "description": "Buy and sell funds, including the funds proposed by the savings guide.",
+          "isolated": false,
+          "linksTo": [],
+          "capabilities": [],
+          "status": {
+            "now": { "web": "na", "app": "planned", "netbank": "native" },
+            "target": { "web": "na", "app": "native", "netbank": "native" }
+          }
+        }
+      ],
+      "steps": [
+        {
+          "id": "a",
+          "lane": "netbank",
+          "phase": "need",
+          "in": "both",
+          "transition": { "now": "start", "target": "start" },
+          "text": "Runs the surplus analysis in the internet bank",
+          "notes": {
+            "now": "The analysis exists only in the internet bank.",
+            "target": "The analysis exists in both the app and the internet bank."
+          }
+        },
+        {
+          "id": "b",
+          "lane": "netbank",
+          "phase": "explore",
+          "in": "both",
+          "transition": { "now": "channel-switch", "target": "channel-switch" },
+          "text": "Sees the effect of inflation in the inflation tool",
+          "notes": {
+            "now": "Same channel, but the result is not saved for the next step.",
+            "target": "The result is saved and follows the customer."
+          }
+        },
+        {
+          "id": "c",
+          "lane": "app",
+          "phase": "explore",
+          "in": "both",
+          "transition": { "now": "restart", "target": "channel-switch" },
+          "text": "Opens the savings guide in the app: risk appetite and a proposed monthly saving",
+          "notes": {
+            "now": "The guide exists only in the app. No link from the internet bank; the customer logs in again and the analysis does not follow.",
+            "target": "Deep link with context: the analysis becomes input to the guide."
+          }
+        },
+        {
+          "id": "d",
+          "lane": "app",
+          "phase": "start",
+          "in": "both",
+          "transition": { "now": "channel-switch", "target": "channel-switch" },
+          "text": "Starts the monthly saving and opens a fund account",
+          "textTarget": "Opens the fund account inside the flow",
+          "notes": {
+            "now": "Monthly saving needs a fund account or ISK, a separate task. Account opening runs in a webview.",
+            "target": "Account opening is linked from the guide and returns to it with the proposal kept."
+          }
+        },
+        {
+          "id": "e",
+          "lane": "app",
+          "phase": "start",
+          "in": "now",
+          "transition": { "now": "restart" },
+          "text": "Returns to the guide, but the proposal did not carry over",
+          "notes": {
+            "now": "Context is not shared between the account-opening task and the guide, so the customer starts the guide again."
+          }
+        },
+        {
+          "id": "f",
+          "lane": "netbank",
+          "phase": "use",
+          "in": "now",
+          "transition": { "now": "channel-switch" },
+          "text": "Buys the funds in the internet bank and has to find them again",
+          "notes": {
+            "now": "Fund trading is not yet in the app, and the guide's proposal is not available in the internet bank."
+          }
+        },
+        {
+          "id": "f2",
+          "lane": "app",
+          "phase": "use",
+          "in": "target",
+          "transition": { "target": "channel-switch" },
+          "text": "Buys the proposed funds directly",
+          "notes": {
+            "target": "Fund trading in app and internet bank with the same rules, terms and proposal."
+          }
+        },
+        {
+          "id": "g",
+          "lane": "support",
+          "phase": "help",
+          "in": "both",
+          "transition": { "now": "to-support", "target": "to-support" },
+          "text": "Calls about risk and tax for the company's investment",
+          "notes": {
+            "now": "Customer service sees neither the analysis nor the proposal.",
+            "target": "Customer service sees the analysis and the guide's proposal."
+          }
+        },
+        {
+          "id": "h",
+          "lane": "advisor",
+          "phase": "deepen",
+          "in": "both",
+          "transition": {
+            "now": "lead-to-advisor",
+            "target": "lead-to-advisor"
+          },
+          "text": "Business advisor takes the whole picture: buffer, liquidity, pension",
+          "notes": {
+            "now": "A larger surplus is a valuable lead.",
+            "target": "The analysis gives the advisor context and a reason to reach out proactively."
+          }
+        }
+      ],
+      "frictions": [
+        {
+          "id": "F1",
+          "lane": "app",
+          "phase": "explore",
+          "owner": "strategy",
+          "assumption": false,
+          "title": "Insight and advice sit in different channels",
+          "now": "The surplus analysis and inflation tool exist only in the internet bank, the savings guide only in the app. The customer switches channel mid-decision and takes nothing along.",
+          "recommendation": "Plan each service across the whole journey, not per channel. Either offer analysis and guide in both channels, or join them with deep links that carry the result.",
+          "othersPattern": "Analysis and investment proposal in one flow."
+        },
+        {
+          "id": "F2",
+          "lane": "app",
+          "phase": "start",
+          "owner": "tech",
+          "assumption": false,
+          "title": "Webviews only handle isolated tasks",
+          "now": "The guide's proposal needs a fund account or ISK, a separate task the customer is normally linked to. A flow that links on cannot run in a webview, so services like the guide cannot be moved between channels as webviews.",
+          "recommendation": "Mark which tasks are isolated and which link on. Use webviews only for isolated tasks; build natively, or require linking and return to the original flow, where the service is part of a longer journey.",
+          "othersPattern": "Account opening in a few taps from inside the app's flow."
+        },
+        {
+          "id": "F3",
+          "lane": "web",
+          "phase": "explore",
+          "owner": "strategy",
+          "assumption": false,
+          "title": "Information does not hang together",
+          "now": "The public website describes the tools but does not lead into the right step. Names and structure differ between web and app.",
+          "recommendation": "Shared terms and content model for the tools in every channel, and entry points that land on the right step after login.",
+          "othersPattern": "Same names and structure for tools in every channel."
+        },
+        {
+          "id": "F4",
+          "lane": "netbank",
+          "phase": "use",
+          "owner": "tech",
+          "assumption": false,
+          "title": "Fund trading is being built for two channels",
+          "now": "Fund trading exists in the internet bank and is coming to the app. Without one shared capability, rules, terms and the guide's proposal risk differing.",
+          "recommendation": "One shared capability with two interfaces: the same rules, the same terms, and the guide's proposal available in both.",
+          "othersPattern": "One trading capability with the same experience everywhere."
+        },
+        {
+          "id": "F5",
+          "lane": "support",
+          "phase": "help",
+          "owner": "tech",
+          "assumption": false,
+          "title": "Customer service cannot see the customer's context",
+          "now": "The analysis and fund proposal are invisible to customer service. The customer explains their situation from the start.",
+          "recommendation": "Context sharing: analysis results and proposals follow the customer to customer service and advisors.",
+          "othersPattern": "Support and advisors see the same material as the customer."
+        },
+        {
+          "id": "F6",
+          "lane": "insight",
+          "phase": "start",
+          "owner": "insight",
+          "assumption": false,
+          "title": "Nobody measures the whole journey",
+          "now": "Use is measured per channel and per tool. Drop-off between analysis, guide and fund account is invisible.",
+          "recommendation": "Measure the journey against the shared goal: share of small businesses that start investing, with drop-off per transition.",
+          "othersPattern": "Goals and measurement per customer journey, not per channel."
+        }
+      ],
+      "feeds": [
+        {
+          "id": "fd1",
+          "kind": "entry",
+          "lane": "other-products",
+          "phase": "need",
+          "to": "a",
+          "text": "Balance grows on the business account",
+          "explanation": "A signal from the account can invite the customer to the surplus analysis, also in the app."
+        },
+        {
+          "id": "fd2",
+          "kind": "entry",
+          "lane": "third-parties",
+          "phase": "explore",
+          "to": "b",
+          "text": "Accounting software shows liquidity",
+          "explanation": "Data via API can prefill the analysis."
+        },
+        {
+          "id": "fd3",
+          "kind": "support",
+          "lane": "support-functions",
+          "phase": "explore",
+          "to": "c",
+          "text": "Fund range and sustainability data",
+          "explanation": "Informs the guide's proposal."
+        },
+        {
+          "id": "fd4",
+          "kind": "support",
+          "lane": "support-functions",
+          "phase": "start",
+          "to": "d",
+          "text": "KYC and signing authority",
+          "explanation": "Decides who may open a fund account for the business."
+        },
+        {
+          "id": "fd5",
+          "kind": "support",
+          "lane": "support-functions",
+          "phase": "deepen",
+          "to": "h",
+          "text": "CRM shows the company's relationship",
+          "explanation": "Gives the advisor the whole picture."
+        }
+      ],
+      "experience": {
+        "now": [0.5, 1, -1, -2, -1.2, 0],
+        "target": [1, 1.5, 1.2, 1.2, 0.8, 1.5]
+      },
+      "presentation": [
+        {
+          "title": "Channels and services",
+          "text": "Which services does the goal need, and where do they exist today?",
+          "layers": ["services"],
+          "focusLanes": ["web", "app", "netbank"],
+          "dimJourney": false
+        },
+        {
+          "title": "Frictions",
+          "text": "Friction appears in the transitions: missing services, webviews in linked flows and restarts.",
+          "layers": ["services", "journey", "frictions"],
+          "focusLanes": [],
+          "dimJourney": false
+        }
+      ]
+    }
+  ]
+}

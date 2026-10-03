@@ -1,0 +1,25 @@
+# Laneboard user guide
+
+Laneboard maps a customer journey across channels. The map, services table, capabilities and KPIs all describe the same data. Your work is saved automatically in this browser; nothing is uploaded. Map journeys, never personal customer data.
+
+**Get started.** Open either Example Bank journey from the welcome screen, then select **Duplicate to edit**. Or start with bank channels or blank lanes. Switch journeys from the left panel. The journey menu lets you duplicate, rename or delete a journey; deleting requires confirmation.
+
+**Build the map.** Phases are columns and lanes are rows. Select a phase or lane in the left tree to edit its name and properties in the inspector. Add lanes, phases or groups with the plus buttons or Library. Drag tree rows to reorder; the inspector also has keyboard-friendly move buttons. Drag a phase’s right edge to resize it. Hide lanes, lock them or collapse groups. Customer notes and the experience curve appear above the channel map; drag a curve point or edit the value through the command palette/inspector.
+
+**Add cards.** Choose a dock tool and click a cell, or double-click a cell for a picker. The Library and command palette can place a card without a mouse. S creates a service, J a journey step, F a friction, E a feed and N a note. Double-click card text for inline editing, or select a card to use the inspector. Drag cards into another cell. Shift-drag selects several; Ctrl/Cmd-click adds to a selection. Copy, paste, duplicate or delete cards. Ctrl/Cmd+Z undoes changes; Ctrl/Cmd+Shift+Z redoes them.
+
+**Services and rules.** Services show a word and a dot for their per-channel status: native, webview, information, missing, planned or not applicable. Open **View data** for the services table and edit statuses in the selected mode. A service that links to another service cannot be isolated: adding a link clears and disables the isolated flag. Rules flag linked webviews and single-channel services, explain the problem and list required technical capabilities. Capabilities are technical abilities, separate from customer-facing services.
+
+**Compare now and target.** The top-right switch changes statuses, visible steps, edge transitions, experience values, rules and KPIs. Changed service statuses receive a highlight and a “Changed” tag. In the investing example, restarts drop from two to zero. Target friction text is a recommendation, not a claim that a problem has already been resolved.
+
+**Layers and filters.** Toggle services, journey, frictions, feeds, market, owners or sketches in the inspector. Search card text and use the filters for owner, severity or lane; non-matching items are dimmed. The Owners layer outlines lanes by owner. Definitions lets you maintain shared owners and capabilities. Overview shows owners’ frictions and the silos / cross-cutting role / shared goal diagram.
+
+**Sketch.** Switch the dock to Sketch and use rectangle (R), ellipse (O), arrow (A), text (T) or sticky note (N). Place a shape, resize it with its handles and edit it in the inspector. Pin it to a lane and phase so it follows the cell, or let it float. The Sketches layer hides all annotations. Q keeps a tool active after placement. H or Space+drag pans; Ctrl/Cmd+scroll, pinch and +/− zoom. Use Fit to screen to see the whole map.
+
+**Present.** Select Present for a full-screen guided walkthrough. Arrow keys move through the steps and Escape exits. Imported presentation steps are used when supplied; otherwise six default steps introduce services, journey, frictions, feeds, market and owners. Each slide selects layers and focuses lanes automatically.
+
+**Import and AI.** Import `.laneboard.json` or `.json` with the picker, drop it on the window or paste JSON. Review the title, counts, warnings and errors before committing. Choose add as new journeys or replace matching IDs; a backup can also restore settings and view state. Files over 5 MB or broken references are rejected without changing your workspace. Create with AI takes your scenario and notes, then copies a prompt containing the schema and example. Nothing is sent: paste it into your approved assistant, save its JSON reply and import it.
+
+**Export and protect your work.** Export a journey or whole workspace as JSON. Save a backup at least every two weeks, and before clearing browser data. PNG and SVG capture the current canvas view, mode and layers at 1× or 2×. Export services or frictions as CSV; print a data table with your browser’s print-to-PDF feature. Save to file uses the browser’s local file picker where supported, and falls back to a download elsewhere.
+
+**Settings and shortcuts.** Set English or Swedish, light / dark / system theme, accent and a small local logo. Ctrl/Cmd+K opens the command palette. Ctrl/Cmd+\\ collapses all panels to the file pill and top controls. Shift+M switches now/target. Press ? for the shortcut sheet. Install the app from your browser’s app menu when supported; it works offline after the first complete visit. The “Saved in this browser” indicator confirms each save. If saving fails, immediately export a backup.
