@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 export function Field({
   label,
   value,
@@ -17,6 +17,7 @@ export function Field({
   type?: string;
 }) {
   const id = useId();
+  const [numberDraft, setNumberDraft] = useState<string | null>(null);
   return (
     <div className="lb-field">
       <label htmlFor={id} className="lb-field__label">
@@ -35,8 +36,36 @@ export function Field({
           id={id}
           className="lb-input"
           type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={
+            type === "number" && numberDraft !== null ? numberDraft : value
+          }
+          onFocus={() => {
+            if (type === "number") setNumberDraft(String(value));
+          }}
+          onChange={(e) => {
+            if (type === "number") setNumberDraft(e.target.value);
+            else onChange(e.target.value);
+          }}
+          onBlur={(e) => {
+            if (type !== "number") return;
+            if (
+              e.target.value.trim() &&
+              Number.isFinite(Number(e.target.value))
+            )
+              onChange(e.target.value);
+            setNumberDraft(null);
+          }}
+          onKeyDown={(e) => {
+            if (type !== "number") return;
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              e.stopPropagation();
+              e.currentTarget.value = String(value);
+              e.currentTarget.blur();
+            }
+          }}
           disabled={disabled}
         />
       )}{" "}
