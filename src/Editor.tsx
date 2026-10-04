@@ -430,7 +430,8 @@ function EditorInner() {
         .filter(
           (n) => n.data.entityId === selection.id || n.data.id === selection.id,
         );
-      const node = candidates[0];
+      const node =
+        candidates.find((n) => n.data.lane === selection.lane) || candidates[0];
       if (node) {
         const parent = node.parentId ? flow.getNode(node.parentId) : undefined;
         const x =

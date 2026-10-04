@@ -31,12 +31,29 @@ async function setup(
   await expect(page.locator(".lb-zoombar")).toContainText("100%");
 }
 async function cellMenu(page: Page, id: string) {
-  const cell = node(page, id),
-    box = await cell.boundingBox();
-  await cell.click({
-    button: "right",
-    position: { x: 30, y: box!.height - 20 },
-  });
+  const cell = node(page, id);
+  let position: { x: number; y: number } | null = null;
+  await expect
+    .poll(async () => {
+      position = await cell.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        for (let y = box.height - 20; y >= 20; y -= 20)
+          for (let x = 30; x < box.width - 20; x += 20) {
+            const hit = document.elementFromPoint(box.left + x, box.top + y);
+            // Selectable connections can cross a cell. Use exposed background,
+            // so this gesture really targets the cell rather than a connection.
+            if (
+              hit?.closest(".react-flow__node") === element &&
+              !hit.closest(".lb-card")
+            )
+              return { x, y };
+          }
+        return null;
+      });
+      return position;
+    })
+    .toBeTruthy();
+  await cell.click({ button: "right", position: position! });
   await expect(menu(page)).toBeVisible();
 }
 
@@ -151,6 +168,13 @@ test("keyboard menus restore focus, fit inside the window and preserve native te
   await page.keyboard.press("Escape");
   await expect(menu(page)).toHaveCount(0);
   await expect(service).toBeFocused();
+  // The contextual inspector can extend to the bottom of the viewport.
+  // Dismiss it before testing an empty-canvas click at the window edge.
+  if (await page.locator(".lb-inspector").isVisible())
+    await page
+      .locator(".lb-inspector")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
   await page
     .locator(".react-flow__pane")
     .click({ button: "right", position: { x: 1420, y: 955 } });

@@ -5,6 +5,8 @@ import {
   frictionReference,
   flowAssessment,
   capabilityName,
+  deliveryDescription,
+  serviceDelivery,
 } from "../model/analysis";
 import { useState } from "react";
 import { X, Printer, Download, ArrowRight } from "lucide-react";
@@ -258,7 +260,7 @@ export function Drawer({
                         className="lb-select"
                         aria-label={`${r.service.name} — ${l.name} status`}
                         value={serviceStatus(j, r.service, mode, l.id)}
-                        disabled={disabled}
+                        disabled={disabled || l.locked}
                         onChange={(e) =>
                           s.editJourney((j) => {
                             j.services.find(
@@ -273,6 +275,26 @@ export function Drawer({
                           </option>
                         ))}
                       </select>
+                      {Object.values(
+                        serviceDelivery(j, r.service, mode, l.id),
+                      ).some((v) => v && v !== "unknown") ? (
+                        <p className="lb-field__hint">
+                          {deliveryDescription(j, r.service, mode, l.id)}
+                        </p>
+                      ) : null}
+                      <button
+                        className="lb-row-link"
+                        onClick={() =>
+                          onSelect({
+                            kind: "service",
+                            id: r.service.id,
+                            lane: l.id,
+                            phase: r.service.phase,
+                          })
+                        }
+                      >
+                        {t("deliveryDetails")}…
+                      </button>
                     </td>
                   ))}
                   <td>

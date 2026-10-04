@@ -1,4 +1,10 @@
-import { serviceStatus, flowAssessment, targetState } from "../model/analysis";
+import {
+  serviceStatus,
+  serviceDelivery,
+  channelPlatform,
+  flowAssessment,
+  targetState,
+} from "../model/analysis";
 import type { Journey, Mode, Service } from "../model/schema";
 export type Severity = "none" | "medium" | "high";
 export interface RuleNote {
@@ -6,6 +12,8 @@ export interface RuleNote {
   severity: Severity;
   message: string;
   positive?: boolean;
+  sourceLane?: string;
+  destinationLane?: string;
 }
 export function evaluateService(
   service: Service,
@@ -54,26 +62,46 @@ export function evaluateService(
     for (const other of applicable.filter((l) => l.id !== present[0].id)) {
       const s = serviceStatus(journey, service, mode, other.id),
         effect =
-          s === "info"
-            ? "is referred on"
-            : s === "planned"
-              ? "waits"
-              : "hits a dead end";
+          s === "browser-link"
+            ? "opens a separate browser"
+            : s === "info"
+              ? "is told to visit the web without a direct link"
+              : s === "planned"
+                ? "waits"
+                : "hits a dead end";
       notes.push({
         rule: "R3",
         severity: flowAssessment(service) === "connected" ? "high" : "medium",
         message: `Only in ${present[0].name}. A customer in ${other.name} ${effect} and must switch channel.`,
       });
-      if (other.channel?.type === "digital" && other.channel.webviewHost)
+      if (
+        channelPlatform(other) === "app" &&
+        other.channel?.type === "digital" &&
+        other.channel.webviewHost &&
+        s !== "browser-link"
+      ) {
+        const destination = serviceDelivery(
+            journey,
+            service,
+            mode,
+            present[0].id,
+          ),
+          unsuitable =
+            channelPlatform(present[0]) === "web" &&
+            (destination.system === "legacy" ||
+              destination.responsive === "no");
         notes.push({
           rule: "R3b",
           severity: "none",
-          message: isolated
-            ? `Can be offered in ${other.name} as a webview: the task is isolated.`
-            : flowAssessment(service) === "unknown"
-              ? `Assess the flow connection before deciding whether a webview can support this task in ${other.name}.`
-              : `Webview is not an option in ${other.name}, because the flow links on to ${linked}.`,
+          message: unsuitable
+            ? `Do not offer this web service in ${other.name}: ${present[0].name} uses a legacy or non-responsive page. Improve the web experience first.`
+            : isolated
+              ? `Can be offered in ${other.name} as a webview: the task is isolated.`
+              : flowAssessment(service) === "unknown"
+                ? `Assess the flow connection before deciding whether a webview can support this task in ${other.name}.`
+                : `Webview is not an option in ${other.name}, because the flow links on to ${linked}.`,
         });
+      }
     }
     capabilities.add("session-handover");
     capabilities.add("deep-linking");
@@ -91,6 +119,70 @@ export function evaluateService(
     )
   )
     capabilities.add("context-sharing");
+  for (const source of digital) {
+    if (serviceStatus(journey, service, mode, source.id) !== "browser-link")
+      continue;
+    capabilities.add("deep-linking");
+    capabilities.add("session-handover");
+    const destinationId = serviceDelivery(
+        journey,
+        service,
+        mode,
+        source.id,
+      ).destination,
+      destination = digital.find(
+        (l) =>
+          l.id === destinationId &&
+          l.id !== source.id &&
+          channelPlatform(l) === "web",
+      ),
+      prefix = `Browser handoff from ${source.name}`;
+    if (!destination) {
+      notes.push({
+        rule: "R6",
+        sourceLane: source.id,
+        destinationLane: destinationId || undefined,
+        severity: "medium",
+        message: `${prefix}: choose the web destination before assessing this link.`,
+      });
+      continue;
+    }
+    if (!available(serviceStatus(journey, service, mode, destination.id))) {
+      notes.push({
+        rule: "R6",
+        sourceLane: source.id,
+        destinationLane: destination?.id,
+        severity: "high",
+        message: `${prefix} to ${destination.name}: the service is not available at this destination. Do not offer the link yet.`,
+      });
+      continue;
+    }
+    const delivery = serviceDelivery(journey, service, mode, destination.id);
+    if (delivery.system === "legacy" || delivery.responsive === "no")
+      notes.push({
+        rule: "R7",
+        sourceLane: source.id,
+        destinationLane: destination.id,
+        severity: "high",
+        message: `${prefix} to ${destination.name}: do not offer this link. The destination ${delivery.system === "legacy" ? "uses a legacy system" : "is not responsive"}${delivery.system === "legacy" && delivery.responsive === "no" ? " and is not responsive" : ""}. Improve the web service before linking from the app.`,
+      });
+    else if (delivery.system === "unknown" || delivery.responsive === "unknown")
+      notes.push({
+        rule: "R7",
+        sourceLane: source.id,
+        destinationLane: destination.id,
+        severity: "medium",
+        message: `${prefix} to ${destination.name}: assess the system and responsiveness before offering this link. A newer system does not establish mobile suitability by itself.`,
+      });
+    else
+      notes.push({
+        rule: "R7",
+        sourceLane: source.id,
+        destinationLane: destination.id,
+        severity: "none",
+        message: `${prefix} to ${destination.name}: recorded as modern and responsive. Opens outside the app; check sign-in, retained context and return to the app in customer testing.`,
+      });
+  }
   const severity: Severity = notes.some((n) => n.severity === "high")
     ? "high"
     : notes.some((n) => n.severity === "medium")

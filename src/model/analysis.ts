@@ -1,4 +1,4 @@
-import type { Journey, Service, Status } from "./schema";
+import type { Journey, Lane, Mode, Service, Status } from "./schema";
 
 export const targetState = (j: Journey) => j.targetState || "draft";
 export const serviceStatus = (
@@ -10,6 +10,64 @@ export const serviceStatus = (
   service.status[
     mode === "target" && targetState(j) === "not-started" ? "now" : mode
   ][lane] ?? "unknown";
+export const channelPlatform = (lane: Lane) =>
+  lane.channel?.type === "digital"
+    ? lane.channel.platform || (lane.channel.webviewHost ? "app" : "web")
+    : undefined;
+export function serviceDelivery(
+  j: Journey,
+  service: Service,
+  mode: Mode,
+  lane: string,
+) {
+  const value =
+    service.delivery?.[
+      mode === "target" && targetState(j) === "not-started" ? "now" : mode
+    ]?.[lane];
+  return {
+    system: value?.system || "unknown",
+    responsive: value?.responsive || "unknown",
+    destination: value?.destination || "",
+  } as const;
+}
+export function deliveryDescription(
+  j: Journey,
+  service: Service,
+  mode: Mode,
+  lane: string,
+) {
+  const value = serviceDelivery(j, service, mode, lane),
+    destination = j.lanes.find((l) => l.id === value.destination);
+  return [
+    value.system === "legacy"
+      ? "Legacy system"
+      : value.system === "modern"
+        ? "Modern system"
+        : "System unknown",
+    value.responsive === "yes"
+      ? "Responsive"
+      : value.responsive === "no"
+        ? "Not responsive"
+        : "Responsiveness unknown",
+    destination
+      ? `Destination: ${destination.name}`
+      : value.destination
+        ? "Destination unavailable"
+        : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+export function clearServiceLane(service: Service, lane: string) {
+  for (const mode of ["now", "target"] as const) {
+    delete service.status[mode][lane];
+    if (service.delivery) {
+      delete service.delivery[mode][lane];
+      for (const value of Object.values(service.delivery[mode]))
+        if (value.destination === lane) delete value.destination;
+    }
+  }
+}
 export const flowAssessment = (service: Service) =>
   service.linksTo.length
     ? "connected"
@@ -51,6 +109,7 @@ export function targetSignature(j: Journey) {
       s.name,
       s.phase,
       s.status.target,
+      s.delivery?.target,
       s.linksTo,
       s.flowAssessment,
       s.isolated,
@@ -86,6 +145,18 @@ export function targetChanges(j: Journey) {
     for (const lane of j.lanes.filter((l) => l.channel?.type === "digital")) {
       const before = serviceStatus(j, service, "now", lane.id),
         after = serviceStatus(j, service, "target", lane.id);
+      if (
+        JSON.stringify(serviceDelivery(j, service, "now", lane.id)) !==
+        JSON.stringify(serviceDelivery(j, service, "target", lane.id))
+      )
+        changes.push({
+          kind: "service",
+          id: service.id,
+          label: service.name,
+          lane: lane.name,
+          before: deliveryDescription(j, service, "now", lane.id),
+          after: deliveryDescription(j, service, "target", lane.id),
+        });
       if (before !== after)
         changes.push({
           kind: "service",

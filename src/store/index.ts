@@ -446,6 +446,13 @@ export function createTargetFromNow() {
     if (targetState(j) !== "not-started") return;
     j.services.forEach((s) => {
       s.status.target = { ...s.status.now };
+      if (s.delivery)
+        s.delivery.target = Object.fromEntries(
+          Object.entries(s.delivery.now).map(([id, value]) => [
+            id,
+            { ...value },
+          ]),
+        );
     });
     j.steps = j.steps.filter((s) => s.in !== "target");
     j.steps.forEach((s) => {

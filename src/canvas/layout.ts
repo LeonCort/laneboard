@@ -1,5 +1,6 @@
 import {
   serviceStatus,
+  serviceDelivery,
   frictionReference,
   flowAssessment,
   targetState,
@@ -16,6 +17,7 @@ export interface CardData extends Record<string, unknown> {
   phase: string;
   text: string;
   meta?: string;
+  deliveryLabel?: string;
   status?: string;
   transition?: string;
   number?: number;
@@ -116,7 +118,18 @@ export function layout(
             meta:
               flowAssessment(s) === "connected" ? "linked" : flowAssessment(s),
             status,
-            changed: mode === "target" && status !== s.status.now[l.id],
+            deliveryLabel:
+              status === "browser-link"
+                ? j.lanes.find(
+                    (lane) =>
+                      lane.id === serviceDelivery(j, s, mode, l.id).destination,
+                  )?.name
+                : undefined,
+            changed:
+              mode === "target" &&
+              (status !== s.status.now[l.id] ||
+                JSON.stringify(serviceDelivery(j, s, "now", l.id)) !==
+                  JSON.stringify(serviceDelivery(j, s, "target", l.id))),
             critical: status === "webview" && flowAssessment(s) === "connected",
             dimmed:
               dimmed ||

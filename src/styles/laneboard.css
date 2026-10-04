@@ -1241,6 +1241,7 @@ kbd,
 .lb-status[data-status="native"] {
   --c: var(--ok);
 }
+.lb-status[data-status="browser-link"],
 .lb-status[data-status="webview"],
 .lb-status[data-status="info"] {
   --c: var(--warn);
@@ -1645,6 +1646,7 @@ kbd,
   color: var(--text-2);
   box-shadow: none;
 }
+.lb-card--service[data-status="browser-link"],
 .lb-card--service[data-status="info"],
 .lb-card--service[data-status="webview"] {
   border-style: dashed;
@@ -2479,4 +2481,41 @@ kbd,
     --accent-contrast: #101317;
     --focus: var(--accent);
   }
+}
+
+.lb-service-channel {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+.lb-channel-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 8px 0;
+}
+.lb-channel-details[open] summary {
+  margin-bottom: 8px;
+}
+.lb-channel-details .lb-field {
+  margin-top: 10px;
+}
+
+.lb-handoff-assessment {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.lb-handoff-assessment p {
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+}
+.lb-handoff-assessment [data-severity="high"] {
+  color: var(--crit);
+  background: var(--crit-soft);
+}
+.lb-handoff-assessment [data-severity="medium"] {
+  color: var(--warn);
+  background: var(--warn-soft);
 }

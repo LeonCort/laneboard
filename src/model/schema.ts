@@ -3,6 +3,7 @@ export const statuses = [
   "unknown",
   "native",
   "webview",
+  "browser-link",
   "info",
   "missing",
   "planned",
@@ -74,10 +75,16 @@ export const laneSchema = z.object({
         type: z.literal("digital"),
         authenticated: z.boolean().default(false),
         webviewHost: z.boolean().default(false),
+        platform: z.enum(["app", "web"]).optional(),
       }),
       z.object({ type: z.literal("assisted") }),
     ])
     .optional(),
+});
+export const deliverySchema = z.object({
+  system: z.enum(["unknown", "legacy", "modern"]).optional(),
+  responsive: z.enum(["unknown", "yes", "no"]).optional(),
+  destination: id.optional(),
 });
 export const serviceSchema = z.object({
   ...evidenceFields,
@@ -90,6 +97,12 @@ export const serviceSchema = z.object({
   placementLane: id.optional(),
   linksTo: z.array(id).default([]),
   capabilities: z.array(id).default([]),
+  delivery: z
+    .object({
+      now: z.record(id, deliverySchema).default({}),
+      target: z.record(id, deliverySchema).default({}),
+    })
+    .optional(),
   status: z
     .object({
       now: z.record(id, z.enum(statuses)).default({}),

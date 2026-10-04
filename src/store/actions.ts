@@ -1,3 +1,4 @@
+import { clearServiceLane } from "../model/analysis";
 import { currentJourney, useStore, type Selection } from ".";
 import {
   canConnectCards,
@@ -199,8 +200,7 @@ export function removeStructure(sel: Selection) {
       j.lanes = j.lanes.filter((l) => l.id !== sel.id);
       delete j.cells[sel.id];
       j.services.forEach((s) => {
-        delete s.status.now[sel.id];
-        delete s.status.target[sel.id];
+        clearServiceLane(s, sel.id);
         if (s.placementLane === sel.id)
           s.placementLane = j.lanes.find(
             (l) => l.channel?.type === "digital",

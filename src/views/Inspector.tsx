@@ -1,5 +1,11 @@
+import { ServiceChannelFields } from "../ui/ServiceChannelFields";
 import { EvidenceFields } from "../ui/Workflow";
-import { targetState, serviceStatus, flowAssessment } from "../model/analysis";
+import {
+  targetState,
+  flowAssessment,
+  channelPlatform,
+  clearServiceLane,
+} from "../model/analysis";
 import {
   X,
   Copy,
@@ -25,14 +31,7 @@ import {
 import { useT, type Key } from "../i18n";
 import { Field, Select, Check } from "../ui/fields";
 import { kpis, evaluateService } from "../rules";
-import {
-  statuses,
-  transitions,
-  layers,
-  type Status,
-  type Lane,
-  type Journey,
-} from "../model/schema";
+import { transitions, layers, type Lane, type Journey } from "../model/schema";
 export function Inspector({
   confirm,
   ownerFilter = "",
@@ -504,25 +503,20 @@ export function Inspector({
                     {j.lanes
                       .filter((l) => l.channel?.type === "digital")
                       .map((l) => (
-                        <Select
-                          label={l.name}
+                        <ServiceChannelFields
                           key={l.id}
-                          value={serviceStatus(j, service, mode, l.id)}
+                          journey={j}
+                          service={service}
+                          lane={l}
+                          mode={mode}
                           disabled={disabled}
-                          onChange={(v) =>
-                            edit((j) => {
-                              j.services.find((x) => x.id === sel.id)!.status[
-                                mode
-                              ][l.id] = v as Status;
-                            })
-                          }
-                        >
-                          {statuses.map((v) => (
-                            <option key={v} value={v}>
-                              {t(v)}
-                            </option>
-                          ))}
-                        </Select>
+                          expanded={sel.lane === l.id}
+                          notes={result.notes.filter(
+                            (n) =>
+                              n.sourceLane === l.id ||
+                              n.destinationLane === l.id,
+                          )}
+                        />
                       ))}
                     <span
                       className="lb-severity"
@@ -761,8 +755,7 @@ export function Inspector({
                           else {
                             delete x.channel;
                             j.services.forEach((s) => {
-                              delete s.status.now[x.id];
-                              delete s.status.target[x.id];
+                              clearServiceLane(s, x.id);
                             });
                           }
                         })
@@ -840,8 +833,7 @@ export function Inspector({
                                   : { type: "assisted" };
                               if (v === "assisted")
                                 j.services.forEach((s) => {
-                                  delete s.status.now[sel.id];
-                                  delete s.status.target[sel.id];
+                                  clearServiceLane(s, sel.id);
                                 });
                             })
                           }
@@ -865,6 +857,24 @@ export function Inspector({
                                 })
                               }
                             />
+                            <Select
+                              label={t("platform")}
+                              value={channelPlatform(l) || "web"}
+                              disabled={disabled}
+                              onChange={(platform) =>
+                                edit((j) => {
+                                  const channel = j.lanes.find(
+                                    (x) => x.id === sel.id,
+                                  )!.channel;
+                                  if (channel?.type === "digital")
+                                    channel.platform = platform as
+                                      "app" | "web";
+                                })
+                              }
+                            >
+                              <option value="app">{t("platformApp")}</option>
+                              <option value="web">{t("platformWeb")}</option>
+                            </Select>
                             <Check
                               label={t("webviewHost")}
                               checked={l.channel.webviewHost}

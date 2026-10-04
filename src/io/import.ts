@@ -203,6 +203,14 @@ export function parseImport(raw: string): {
       for (const m of ["now", "target"] as const)
         for (const k of Object.keys(s.status[m]))
           ref(k, digital, `${p}.services[${i}].status.${m}.${k}`);
+      for (const m of ["now", "target"] as const)
+        for (const [lane, value] of Object.entries(s.delivery?.[m] || {})) {
+          const path = `${p}.services[${i}].delivery.${m}.${lane}`;
+          ref(lane, digital, path);
+          ref(value.destination, digital, `${path}.destination`);
+          if (value.destination === lane)
+            errors.push(`${path}.destination: Choose a different channel.`);
+        }
       if (s.isolated && s.linksTo.length) {
         s.isolated = false;
         warnings.push(

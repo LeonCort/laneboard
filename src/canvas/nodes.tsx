@@ -276,6 +276,9 @@ export const CardNode = memo(function CardNode({
             {data.changed ? (
               <span className="lb-tag">{t("changed")}</span>
             ) : null}
+            {data.deliveryLabel ? (
+              <span className="lb-micro">→ {data.deliveryLabel}</span>
+            ) : null}
             {data.meta === "linked" ? (
               <span className="lb-micro">{t("linked")}</span>
             ) : null}

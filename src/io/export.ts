@@ -1,3 +1,4 @@
+import { serviceDelivery, serviceStatus } from "../model/analysis";
 import { toPng, toSvg } from "html-to-image";
 import regular from "@fontsource/geist/files/geist-latin-400-normal.woff2?inline";
 import mono from "@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2?inline";
@@ -65,7 +66,12 @@ export function exportCSV(
             "Description",
             "Isolated",
             "Links to",
-            ...digital.map((l) => l.name),
+            ...digital.flatMap((l) => [
+              l.name,
+              `${l.name} system`,
+              `${l.name} responsive`,
+              `${l.name} destination`,
+            ]),
             "Severity",
             "Rules",
             "Capabilities",
@@ -77,7 +83,16 @@ export function exportCSV(
               s.description,
               s.isolated,
               s.linksTo.join("; "),
-              ...digital.map((l) => s.status[mode][l.id] ?? "na"),
+              ...digital.flatMap((l) => {
+                const value = serviceDelivery(j, s, mode, l.id);
+                return [
+                  serviceStatus(j, s, mode, l.id),
+                  value.system,
+                  value.responsive,
+                  j.lanes.find((lane) => lane.id === value.destination)?.name ||
+                    "",
+                ];
+              }),
               r.severity,
               r.notes.map((n) => `${n.rule}: ${n.message}`).join("; "),
               r.capabilities.join("; "),
