@@ -24,6 +24,7 @@ Generated from the committed lockfile. Fonts are self-hosted; their font files u
 | @radix-ui/react-focus-scope | 1.1.16 | MIT |
 | @radix-ui/react-id | 1.1.4 | MIT |
 | @radix-ui/react-menu | 2.1.24 | MIT |
+| @radix-ui/react-popover | 1.1.23 | MIT |
 | @radix-ui/react-popper | 1.3.7 | MIT |
 | @radix-ui/react-portal | 1.1.17 | MIT |
 | @radix-ui/react-presence | 1.1.10 | MIT |

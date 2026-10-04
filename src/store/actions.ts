@@ -5,23 +5,98 @@ import {
   laneSchema,
   groupSchema,
   type Journey,
+  type Lane,
 } from "../model/schema";
 export function addLane() {
-  const s = useStore.getState();
-  s.editJourney((j) => {
-    const id = newId("lane");
-    j.lanes.push(
-      laneSchema.parse({
-        id,
-        name: "New lane",
-        kind: "channel",
-        group: j.laneGroups.find((g) => g.id === "self")?.id || null,
-        channel: { type: "digital", authenticated: true, webviewHost: false },
-      }),
-    );
-    j.cells[id] = j.phases.map(() => "");
-    s.select({ kind: "lane", id });
+  const j = currentJourney(useStore.getState());
+  createLane({
+    name: "New lane",
+    group: j?.laneGroups.find((g) => g.id === "self")?.id || null,
+    kind: "channel",
+    channel: { type: "digital", authenticated: true, webviewHost: false },
   });
+}
+
+export function createLane(
+  draft: Pick<Lane, "name" | "group" | "kind"> &
+    Partial<Pick<Lane, "sub" | "channel">>,
+) {
+  const s = useStore.getState(),
+    j = currentJourney(s);
+  if (
+    !j ||
+    j.readOnly ||
+    j.lanes.length >= 100 ||
+    !draft.name.trim() ||
+    (draft.group !== null && !j.laneGroups.some((g) => g.id === draft.group))
+  )
+    return;
+  const lane = laneSchema.parse({
+    ...draft,
+    name: draft.name.trim(),
+    id: newId("lane"),
+  });
+  s.edit((w) => {
+    const journey = w.journeys.find((x) => x.id === j.id)!;
+    // Append within the chosen group without changing any existing lane IDs.
+    const last = journey.lanes.map((l) => l.group).lastIndexOf(lane.group);
+    journey.lanes.splice(last < 0 ? journey.lanes.length : last + 1, 0, lane);
+    journey.cells[lane.id] = journey.phases.map(() => "");
+    w.ui.collapsedGroups = w.ui.collapsedGroups.filter((g) => g !== lane.group);
+    if (lane.kind === "market" && !w.ui.layers.includes("market"))
+      w.ui.layers.push("market");
+  });
+  s.select({ kind: "lane", id: lane.id });
+  return lane.id;
+}
+
+export function updateLane(
+  id: string,
+  draft: Pick<Lane, "name" | "sub" | "group"> & Partial<Pick<Lane, "hidden">>,
+) {
+  const s = useStore.getState(),
+    j = currentJourney(s);
+  if (
+    !j ||
+    j.readOnly ||
+    !j.lanes.some((l) => l.id === id) ||
+    !draft.name.trim() ||
+    (draft.group !== null && !j.laneGroups.some((g) => g.id === draft.group))
+  )
+    return;
+  s.edit((w) => {
+    const lane = w.journeys
+      .find((x) => x.id === j.id)!
+      .lanes.find((l) => l.id === id)!;
+    if (lane.group !== draft.group)
+      w.ui.collapsedGroups = w.ui.collapsedGroups.filter(
+        (g) => g !== draft.group,
+      );
+    Object.assign(lane, { ...draft, name: draft.name.trim() });
+  });
+  if (draft.hidden && s.selection?.kind === "lane" && s.selection.id === id)
+    s.select(null);
+}
+
+export function setLaneHidden(id: string, hidden: boolean) {
+  const s = useStore.getState(),
+    j = currentJourney(s);
+  if (!j || j.readOnly || !j.lanes.some((l) => l.id === id)) return;
+  s.edit((w) => {
+    const lane = w.journeys
+      .find((x) => x.id === j.id)!
+      .lanes.find((l) => l.id === id)!;
+    lane.hidden = hidden;
+    if (!hidden) {
+      w.ui.collapsedGroups = w.ui.collapsedGroups.filter(
+        (g) => g !== lane.group,
+      );
+      if (lane.kind === "market" && !w.ui.layers.includes("market"))
+        w.ui.layers.push("market");
+    }
+  });
+  if (hidden && s.selection?.kind === "lane" && s.selection.id === id)
+    s.select(null);
 }
 export function addPhase() {
   const s = useStore.getState();

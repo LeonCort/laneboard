@@ -245,10 +245,17 @@
   border-top: 1px dashed var(--border-strong);
   padding-top: var(--space-1);
   color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .lb-sticky-line[data-kind="boundary"] {
   border-color: var(--edge-support);
-  color: var(--edge-support);
+  color: var(--warn);
+}
+.lb-sticky-row--line {
+  padding: 0 8px;
+  overflow: visible;
 }
 .lb-sketch-wrap {
   position: relative;
@@ -671,6 +678,116 @@
   top: var(--panel-top);
   margin: 0;
   padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lb-sticky-row--group {
+  padding: 0 4px;
+  overflow: visible;
+  justify-content: center;
+}
+.lb-inline-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.lb-inline-group .lb-sticky-group {
+  flex: 1;
+  min-width: 0;
+}
+.lb-sticky-group svg {
+  flex-shrink: 0;
+}
+.lb-sticky-group[aria-expanded="false"] > svg {
+  transform: rotate(-90deg);
+}
+.lb-sticky-group > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-inline-add {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  padding: 0;
+}
+.lb-inline-add:not(:disabled):hover,
+.lb-inline-add:focus-visible,
+.lb-lane-title--editable:hover,
+.lb-lane-title--editable:focus-visible,
+.lb-lane-title--editable[data-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.lb-lane-title--editable {
+  position: relative;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  margin: -2px -4px 0;
+  cursor: pointer;
+  padding-right: 16px;
+}
+.lb-lane-edit-icon {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  opacity: 0;
+}
+.lb-lane-title--editable:hover .lb-lane-edit-icon,
+.lb-lane-title--editable:focus-visible .lb-lane-edit-icon,
+.lb-lane-title--editable[data-selected="true"] .lb-lane-edit-icon {
+  opacity: 1;
+}
+.lb-lane-popover {
+  z-index: var(--z-modal);
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(580px, calc(100vh - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-island);
+  color: var(--text);
+}
+.lb-lane-popover form {
+  display: grid;
+  gap: var(--space-3);
+}
+.lb-lane-popover__heading,
+.lb-lane-popover__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.lb-lane-popover__heading h2 {
+  margin: 0;
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+.lb-lane-popover__footer {
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+.lb-lane-popover__footer .lb-btn {
+  padding-inline: var(--space-2);
+}
+.lb-hidden-lanes {
+  gap: 5px;
+  font-size: var(--text-xs);
+  padding-inline: var(--space-2);
 }
 .lb-editor[data-view="overview"] .react-flow__renderer,
 .lb-editor[data-view="overview"] .react-flow__viewport,

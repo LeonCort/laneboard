@@ -84,6 +84,11 @@ import { useT, type Key } from "./i18n";
 import { exampleFile } from "./examples";
 import { layout, type CardData, type CellData } from "./canvas/layout";
 import { nodeTypes, edgeTypes } from "./canvas/nodes";
+import {
+  AddLaneButton,
+  HiddenLanesControl,
+  LaneLabel,
+} from "./canvas/LaneControls";
 import { Inspector } from "./views/Inspector";
 import { Drawer, type Tab } from "./views/Drawer";
 import { Overview } from "./views/Overview";
@@ -180,7 +185,7 @@ function EditorInner() {
       present !== null ? 16 : collapsed || canvasSize.width <= 960 ? 84 : 340,
     rightInset =
       present !== null || collapsed || canvasSize.width <= 960 ? 16 : 304,
-    labelWidth = present !== null ? 132 : 108,
+    labelWidth = 132,
     phaseTop = present !== null ? 16 : 108,
     laneTop = phaseTop + 40,
     columnLeft = leftX + labelWidth + 8;
@@ -261,7 +266,7 @@ function EditorInner() {
     if (journeyId) {
       const v = useStore.getState().workspace.ui.viewport;
       flow.setViewport(
-        v || { x: window.innerWidth <= 960 ? 208 : 464, y: 156, zoom: 0.68 },
+        v || { x: window.innerWidth <= 960 ? 232 : 488, y: 156, zoom: 0.68 },
       );
     }
     setSearch("");
@@ -764,6 +769,38 @@ function EditorInner() {
         : [...ui.collapsedGroups, id];
     });
   }
+  function revealLane(id: string) {
+    const state = useStore.getState(),
+      journey = currentJourney(state);
+    if (!journey) return;
+    const row = layout(journey, state.workspace.ui, null).rows.find(
+      (r) => r.id === id,
+    );
+    if (!row) return;
+    const current = flow.getViewport(),
+      top = laneTop + 8,
+      bottom = canvasSize.height - (collapsed ? 24 : 72);
+    const rowTop = current.y + row.y * current.zoom,
+      rowBottom = rowTop + row.height * current.zoom;
+    const y =
+      rowTop < top
+        ? top - row.y * current.zoom
+        : rowBottom > bottom
+          ? Math.max(
+              top - row.y * current.zoom,
+              bottom - (row.y + row.height) * current.zoom,
+            )
+          : current.y;
+    if (y !== current.y)
+      void flow.setViewport({ ...current, y }, { duration: 180 });
+    requestAnimationFrame(() =>
+      document
+        .querySelector<HTMLButtonElement>(
+          `[data-lane-label="${CSS.escape(id)}"]`,
+        )
+        ?.focus({ preventScroll: true }),
+    );
+  }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -777,6 +814,8 @@ function EditorInner() {
         return;
       }
       const active = document.activeElement;
+      if (active instanceof HTMLElement && active.closest(".lb-lane-popover"))
+        return;
       if (
         active instanceof HTMLElement &&
         (active.isContentEditable ||
@@ -926,13 +965,22 @@ function EditorInner() {
         minZoom={0.1}
         maxZoom={2}
         defaultViewport={
-          s.workspace.ui.viewport || { x: leftX + 124, y: 156, zoom: 0.68 }
+          s.workspace.ui.viewport || { x: columnLeft + 8, y: 156, zoom: 0.68 }
         }
         onMoveEnd={(_, v) => {
-          if (present === null)
-            setUI((ui) => {
-              ui.viewport = v;
-            });
+          if (present === null) {
+            // Moving the camera must not consume the undo for a lane edit.
+            const history = useStore.temporal.getState(),
+              wasTracking = history.isTracking;
+            history.pause();
+            try {
+              setUI((ui) => {
+                ui.viewport = v;
+              });
+            } finally {
+              if (wasTracking) history.resume();
+            }
+          }
         }}
         onNodeClick={(_, node) => {
           if (node.type === "cell") {
@@ -1083,18 +1131,34 @@ function EditorInner() {
                   }}
                 >
                   {row.kind === "group" ? (
-                    <button
-                      className="lb-sticky-group"
-                      aria-expanded={
-                        !s.workspace.ui.collapsedGroups.includes(row.id)
-                      }
-                      onClick={() => toggleGroup(row.id)}
-                    >
-                      <ChevronDown size={12} />
-                      {row.name}
-                    </button>
+                    <div className="lb-inline-group">
+                      <button
+                        className="lb-sticky-group"
+                        title={row.name}
+                        aria-expanded={
+                          !s.workspace.ui.collapsedGroups.includes(row.id)
+                        }
+                        onClick={() => toggleGroup(row.id)}
+                      >
+                        <ChevronDown size={12} />
+                        <span>{row.name}</span>
+                      </button>
+                      {present === null ? (
+                        <AddLaneButton
+                          key={j.id}
+                          journey={j}
+                          group={row.id}
+                          compact
+                          reveal={revealLane}
+                        />
+                      ) : null}
+                    </div>
                   ) : row.kind === "line" ? (
-                    <span className="lb-sticky-line" data-kind={row.lineKind}>
+                    <span
+                      className="lb-sticky-line"
+                      data-kind={row.lineKind}
+                      title={row.name}
+                    >
                       {row.lineKind === "boundary"
                         ? "Self-service boundary"
                         : "Line of visibility"}
@@ -1103,12 +1167,21 @@ function EditorInner() {
                     <span className="lb-micro">{t("experience")}</span>
                   ) : (
                     <>
-                      <button
-                        className="lb-lane-title"
-                        onClick={() => s.select({ kind: "lane", id: row.id })}
-                      >
-                        {row.name}
-                      </button>
+                      {present === null ? (
+                        <LaneLabel
+                          key={`${j.id}-${row.id}`}
+                          journey={j}
+                          lane={j.lanes.find((l) => l.id === row.id)!}
+                          reveal={revealLane}
+                        />
+                      ) : (
+                        <button
+                          className="lb-lane-title"
+                          onClick={() => s.select({ kind: "lane", id: row.id })}
+                        >
+                          {row.name}
+                        </button>
+                      )}
                       <span className="lb-lane-label__sub">{row.sub}</span>
                     </>
                   )}
@@ -1215,6 +1288,12 @@ function EditorInner() {
                 </button>
               ))}
             </div>
+            {view === "canvas" ? (
+              <>
+                <AddLaneButton key={j.id} journey={j} reveal={revealLane} />
+                <HiddenLanesControl journey={j} reveal={revealLane} />
+              </>
+            ) : null}
           </Panel>
         ) : null}
         <Panel position="top-right" className="lb-island lb-cluster">
@@ -1531,6 +1610,12 @@ function EditorInner() {
                                       }
                                     </span>
                                   </button>
+                                  <AddLaneButton
+                                    key={j.id}
+                                    journey={j}
+                                    group={group}
+                                    reveal={revealLane}
+                                  />
                                   <button
                                     className="lb-iconbtn"
                                     aria-label={`Edit group ${group}`}

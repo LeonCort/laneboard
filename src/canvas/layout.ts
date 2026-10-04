@@ -191,140 +191,148 @@ export function layout(
       Math.max(c.kind === "step" ? 60 : 52, lines * 18 + 38),
     );
   });
-  let y = 0,
-    lastGroup: string | null = null;
-  const orderedLanes = [
-    ...j.lanes.filter((l) => l.group === null),
-    ...j.laneGroups.flatMap((g) => j.lanes.filter((l) => l.group === g.id)),
-  ];
-  for (const l of orderedLanes) {
-    if (l.hidden || (l.kind === "market" && !active.has("market"))) continue;
-    if (l.group !== lastGroup) {
-      const previous = j.laneGroups.find((g) => g.id === lastGroup);
-      if (previous?.lineAfter) {
-        rows.push({
-          id: `line-${previous.id}`,
-          y,
-          height: 28,
-          kind: "line",
-          name: previous.lineAfter.label,
-          lineKind: previous.lineAfter.kind,
-        });
-        y += 36;
-      }
-      lastGroup = l.group;
-      const g = j.laneGroups.find((g) => g.id === l.group);
-      if (g) {
-        rows.push({ id: g.id, y, height: 30, kind: "group", name: g.name });
-        y += 38;
-      }
-    }
-    if (ui.collapsedGroups.includes(l.group || "")) continue;
-    const rowHeight = Math.max(
-      l.kind === "customer" ? 94 : 90,
-      ...columns.map((p) => {
-        const cs = cards.filter((c) => c.lane === l.id && c.phase === p.id);
-        const cellText =
-          j.cells[l.id]?.[j.phases.findIndex((x) => x.id === p.id)] || "";
-        return (
-          cs.reduce(
-            (a, c) =>
-              a + (heights.get(`${c.kind}-${c.entityId}-${c.lane}`) || 52) + 8,
-            16,
-          ) +
-          (cellText
-            ? Math.ceil(cellText.length / Math.max(20, (p.width - 24) / 6)) *
-                17 +
-              12
-            : 0)
-        );
-      }),
-    );
-    rows.push({
-      id: l.id,
-      y,
-      height: rowHeight,
-      kind: "lane",
-      name: l.name,
-      sub: l.sub,
-      group: l.tint || (l.kind === "customer" ? "customer" : l.group || l.kind),
-    });
-    for (const p of columns) {
-      const cellId = `cell-${l.id}-${p.id}`,
-        text = j.cells[l.id]?.[j.phases.findIndex((x) => x.id === p.id)] || "",
-        dimmed =
-          (focus.length > 0 && !focus.includes(l.id)) ||
-          match(text, l.owner, l.id);
-      nodes.push({
-        id: cellId,
-        type: "cell",
-        position: { x: p.x, y },
-        data: {
-          lane: l.id,
-          phase: p.id,
-          group:
-            l.tint || (l.kind === "customer" ? "customer" : l.group || l.kind),
-          width: p.width,
-          height: rowHeight,
-          text,
-          readOnly: j.readOnly || l.locked,
-          dimmed,
-          ownerIndex: active.has("owners") ? l.owner : undefined,
-        },
-        style: { width: p.width, height: rowHeight },
-        selectable: false,
-        draggable: false,
-        connectable: false,
-        zIndex: 0,
-      });
-      let cy = 8;
-      for (const c of cards.filter(
-        (c) => c.lane === l.id && c.phase === p.id,
-      )) {
-        const nid = `${c.kind}-${c.entityId}-${c.lane}`,
-          height = heights.get(nid) || 52;
-        nodes.push({
-          id: nid,
-          type: "card",
-          parentId: cellId,
-          position: { x: 8, y: cy },
-          data: { ...c, cellId },
-          style: { width: p.width - 16, height },
-          selected: selection?.id === c.entityId && selection.kind === c.kind,
-          draggable: !j.readOnly && !l.locked,
-          zIndex: 5,
-          ariaLabel: `${c.kind}: ${c.text}`,
-        });
-        cy += height + 8;
-      }
-    }
-    y += rowHeight + 10;
-    if (l.kind === "customer" && !rows.some((r) => r.kind === "curve")) {
+  let y = 0;
+  // Keep empty groups on the map so their inline add control remains available.
+  for (const group of [null, ...j.laneGroups]) {
+    if (group) {
       rows.push({
-        id: "curve",
+        id: group.id,
         y,
-        height: 110,
-        kind: "curve",
-        name: "Customer experience",
+        height: 30,
+        kind: "group",
+        name: group.name,
       });
-      nodes.push({
-        id: "curve",
-        type: "curve",
-        position: { x: 0, y },
-        data: {
-          columns,
-          now: j.experience.now,
-          target: j.experience.target,
-          mode,
-          readOnly: j.readOnly,
-          width: totalWidth,
-        },
-        style: { width: totalWidth, height: 110 },
-        draggable: false,
-        selectable: false,
-        connectable: false,
+      y += 38;
+    }
+    for (const l of j.lanes.filter((l) => l.group === (group?.id ?? null))) {
+      if (
+        l.hidden ||
+        (l.kind === "market" && !active.has("market")) ||
+        ui.collapsedGroups.includes(l.group || "")
+      )
+        continue;
+      const rowHeight = Math.max(
+        l.kind === "customer" ? 94 : 90,
+        ...columns.map((p) => {
+          const cs = cards.filter((c) => c.lane === l.id && c.phase === p.id);
+          const cellText =
+            j.cells[l.id]?.[j.phases.findIndex((x) => x.id === p.id)] || "";
+          return (
+            cs.reduce(
+              (a, c) =>
+                a +
+                (heights.get(`${c.kind}-${c.entityId}-${c.lane}`) || 52) +
+                8,
+              16,
+            ) +
+            (cellText
+              ? Math.ceil(cellText.length / Math.max(20, (p.width - 24) / 6)) *
+                  17 +
+                12
+              : 0)
+          );
+        }),
+      );
+      rows.push({
+        id: l.id,
+        y,
+        height: rowHeight,
+        kind: "lane",
+        name: l.name,
+        sub: l.sub,
+        group:
+          l.tint || (l.kind === "customer" ? "customer" : l.group || l.kind),
       });
-      y += 128;
+      for (const p of columns) {
+        const cellId = `cell-${l.id}-${p.id}`,
+          text =
+            j.cells[l.id]?.[j.phases.findIndex((x) => x.id === p.id)] || "",
+          dimmed =
+            (focus.length > 0 && !focus.includes(l.id)) ||
+            match(text, l.owner, l.id);
+        nodes.push({
+          id: cellId,
+          type: "cell",
+          position: { x: p.x, y },
+          data: {
+            lane: l.id,
+            phase: p.id,
+            group:
+              l.tint ||
+              (l.kind === "customer" ? "customer" : l.group || l.kind),
+            width: p.width,
+            height: rowHeight,
+            text,
+            readOnly: j.readOnly || l.locked,
+            dimmed,
+            ownerIndex: active.has("owners") ? l.owner : undefined,
+          },
+          style: { width: p.width, height: rowHeight },
+          selectable: false,
+          draggable: false,
+          connectable: false,
+          zIndex: 0,
+        });
+        let cy = 8;
+        for (const c of cards.filter(
+          (c) => c.lane === l.id && c.phase === p.id,
+        )) {
+          const nid = `${c.kind}-${c.entityId}-${c.lane}`,
+            height = heights.get(nid) || 52;
+          nodes.push({
+            id: nid,
+            type: "card",
+            parentId: cellId,
+            position: { x: 8, y: cy },
+            data: { ...c, cellId },
+            style: { width: p.width - 16, height },
+            selected: selection?.id === c.entityId && selection.kind === c.kind,
+            draggable: !j.readOnly && !l.locked,
+            zIndex: 5,
+            ariaLabel: `${c.kind}: ${c.text}`,
+          });
+          cy += height + 8;
+        }
+      }
+      y += rowHeight + 10;
+      if (l.kind === "customer" && !rows.some((r) => r.kind === "curve")) {
+        rows.push({
+          id: "curve",
+          y,
+          height: 110,
+          kind: "curve",
+          name: "Customer experience",
+        });
+        nodes.push({
+          id: "curve",
+          type: "curve",
+          position: { x: 0, y },
+          data: {
+            columns,
+            now: j.experience.now,
+            target: j.experience.target,
+            mode,
+            readOnly: j.readOnly,
+            width: totalWidth,
+          },
+          style: { width: totalWidth, height: 110 },
+          draggable: false,
+          selectable: false,
+          connectable: false,
+        });
+        y += 128;
+      }
+    }
+    if (group?.lineAfter) {
+      rows.push({
+        id: `line-${group.id}`,
+        y,
+        height: 28,
+        kind: "line",
+        name: group.lineAfter.label,
+        lineKind: group.lineAfter.kind,
+      });
+      y += 36;
     }
   }
   if (active.has("journey")) {

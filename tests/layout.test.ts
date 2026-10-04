@@ -40,3 +40,29 @@ it("routes across collapsed and hidden lanes without dangling edges", () => {
     true,
   );
 });
+
+it("keeps empty and fully hidden groups available without rendering their cells", () => {
+  const j = structuredClone(investingExample.journeys[0]);
+  j.laneGroups.push({ id: "research", name: "Research" });
+  j.lanes
+    .filter((l) => l.group === "assisted")
+    .forEach((l) => {
+      l.hidden = true;
+    });
+  const graph = layout(j, uiSchema.parse({ collapsedGroups: ["self"] }), null);
+  expect(graph.rows.filter((r) => r.kind === "group").map((r) => r.id)).toEqual(
+    j.laneGroups.map((g) => g.id),
+  );
+  expect(
+    graph.rows.some(
+      (r) =>
+        r.kind === "lane" &&
+        j.lanes.find((l) => l.id === r.id)?.group === "assisted",
+    ),
+  ).toBe(false);
+  expect(
+    graph.nodes.some(
+      (n) => n.id.startsWith("cell-advisor-") || n.id.startsWith("cell-app-"),
+    ),
+  ).toBe(false);
+});
