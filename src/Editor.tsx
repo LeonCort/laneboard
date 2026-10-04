@@ -87,6 +87,7 @@ import {
   copyCards,
   pasteCards,
   setCardLink,
+  reconnectCardLink,
   setLaneHidden,
 } from "./store/actions";
 import {
@@ -94,6 +95,10 @@ import {
   cardTarget,
   canConnectCards,
   hasCardLink,
+  canReconnectConnection,
+  canEditConnection,
+  connectionEdgeId,
+  type ConnectionRef,
 } from "./model/connections";
 import { useT, type Key } from "./i18n";
 import { exampleFile } from "./examples";
@@ -193,6 +198,7 @@ function EditorInner() {
     [space, setSpace] = useState(false);
   const [sheet, setSheet] = useState<"tools" | "details" | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextTarget | null>(null);
+  const reconnecting = useRef<ConnectionRef | null>(null);
   const seenJourneys = useRef(new Set(s.workspace.journeys.map((j) => j.id)));
   const narrow = canvasSize.width <= 960;
   const newJourneyPending =
@@ -249,7 +255,12 @@ function EditorInner() {
           ? 84
           : 340,
     rightInset =
-      present !== null || !s.selection || canvasSize.width <= 960 ? 16 : 304,
+      present !== null ||
+      !s.selection ||
+      s.selection.kind === "connection" ||
+      canvasSize.width <= 960
+        ? 16
+        : 304,
     labelWidth = 132,
     phaseTop = present !== null ? 16 : canvasSize.width <= 520 ? 108 : 60,
     laneTop = phaseTop + 40,
@@ -311,6 +322,22 @@ function EditorInner() {
   useEffect(() => {
     setNodes(graph?.nodes || []);
   }, [graph]);
+  useEffect(() => {
+    const state = useStore.getState(),
+      selection = state.selection;
+    if (selection?.kind !== "connection" || !graph) return;
+    const edge = graph.edges.find((edge) => edge.id === selection.id),
+      ref = edge?.data?.connection as ConnectionRef | undefined,
+      previous = selection.connection;
+    if (!ref) state.select(null);
+    else if (
+      ref.source.id !== previous?.source.id ||
+      ref.source.kind !== previous.source.kind ||
+      ref.source.lane !== previous.source.lane ||
+      ref.target.id !== previous.target.id
+    )
+      state.select({ ...selection, connection: ref });
+  }, [graph, s.selection]);
   const validConnection = useCallback(
     (connection: Connection | Edge) => {
       const from = flow.getNode(connection.source),
@@ -323,8 +350,16 @@ function EditorInner() {
         j &&
         source &&
         target &&
-        canConnectCards(j, source, target, s.workspace.ui.mode) &&
-        !hasCardLink(j, source, target)
+        (reconnecting.current
+          ? canReconnectConnection(
+              j,
+              reconnecting.current,
+              source,
+              target,
+              s.workspace.ui.mode,
+            )
+          : canConnectCards(j, source, target, s.workspace.ui.mode) &&
+            !hasCardLink(j, source, target, s.workspace.ui.mode))
       );
     },
     [flow, j, s.workspace.ui.mode],
@@ -432,6 +467,7 @@ function EditorInner() {
   }, [present, finishPresent]);
   const startPresent = () => {
     if (!j) return;
+    if (s.selection?.kind === "connection") s.select(null);
     originalPresent.current = {
       layers: s.workspace.ui.layers,
       viewport: flow.getViewport(),
@@ -921,6 +957,16 @@ function EditorInner() {
       )
     )
       return null;
+    const edgeId = element.closest<SVGElement>(".react-flow__edge")?.dataset.id,
+      edge = edgeId ? flow.getEdge(edgeId) : undefined;
+    if (edge?.data?.connection)
+      return {
+        selection: {
+          kind: "connection",
+          id: edge.id,
+          connection: edge.data.connection as ConnectionRef,
+        } as Selection,
+      };
     const structure = element.closest<HTMLElement>(
       "[data-context-lane], [data-context-phase], [data-context-group]",
     );
@@ -1025,16 +1071,20 @@ function EditorInner() {
       ? flow.getNode(contextMenu.nodeId)
       : undefined,
     contextTitle =
-      contextSelection?.kind === "cell"
-        ? `${contextLane?.name} · ${contextPhase?.name}`
-        : contextSelection?.kind === "lane"
-          ? contextLane?.name
-          : contextSelection?.kind === "phase"
-            ? contextPhase?.name
-            : contextSelection?.kind === "group"
-              ? contextGroup?.name
-              : (contextNode?.data.text as string | undefined) ||
-                (contextSelection?.kind === "sketch" ? t("sketch") : undefined);
+      contextSelection?.kind === "connection"
+        ? t("connectionControls")
+        : contextSelection?.kind === "cell"
+          ? `${contextLane?.name} · ${contextPhase?.name}`
+          : contextSelection?.kind === "lane"
+            ? contextLane?.name
+            : contextSelection?.kind === "phase"
+              ? contextPhase?.name
+              : contextSelection?.kind === "group"
+                ? contextGroup?.name
+                : (contextNode?.data.text as string | undefined) ||
+                  (contextSelection?.kind === "sketch"
+                    ? t("sketch")
+                    : undefined);
   const clickControl = (selector: string) =>
     requestAnimationFrame(() =>
       document.querySelector<HTMLButtonElement>(selector)?.click(),
@@ -1051,7 +1101,7 @@ function EditorInner() {
         ["service", "step", "friction", "feed", "note", "sketch"].includes(
           selection.kind,
         );
-    if (selection)
+    if (selection && selection.kind !== "connection")
       contextCommands.push({
         label: t("editDetails"),
         restoreFocus: false,
@@ -1069,8 +1119,35 @@ function EditorInner() {
           if (selection) s.select({ ...selection, inline: true });
         },
       });
-    if (card && selection) {
-      if (selection.kind === "service" || selection.kind === "feed")
+    if (selection?.kind === "connection" && selection.connection) {
+      const disabled = !canEditConnection(
+        j,
+        selection.connection,
+        s.workspace.ui.mode,
+      );
+      for (const end of ["source", "target"] as const)
+        contextCommands.push({
+          label: t(end === "source" ? "changeSource" : "changeDestination"),
+          disabled,
+          restoreFocus: false,
+          run: () =>
+            clickControl(
+              `[data-edge-controls="${CSS.escape(selection.id)}"] [data-edge-action="${end}"]`,
+            ),
+        });
+      contextCommands.push({
+        label: t("deleteConnection"),
+        disabled,
+        destructive: true,
+        separator: true,
+        run: deleteSelection,
+      });
+    } else if (card && selection) {
+      if (
+        selection.kind === "service" ||
+        selection.kind === "feed" ||
+        selection.kind === "step"
+      )
         contextCommands.push({
           label: t("connectCard"),
           disabled: blocked,
@@ -1326,6 +1403,9 @@ function EditorInner() {
       data-view={view}
       data-present={present !== null}
       aria-label="Laneboard editor"
+      style={
+        { "--lb-reconnect-radius": `${10 / viewport.zoom}px` } as CSSProperties
+      }
       onContextMenuCapture={(e) => {
         if (e.shiftKey) {
           setContextMenu(null);
@@ -1392,6 +1472,70 @@ function EditorInner() {
         edges={graph?.edges || []}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onEdgesChange={(changes) => {
+          for (const change of changes)
+            if (change.type === "select") {
+              const state = useStore.getState();
+              if (change.selected && state.selection?.id !== change.id) {
+                const edge = flow.getEdge(change.id);
+                if (edge?.data?.connection)
+                  state.select({
+                    kind: "connection",
+                    id: edge.id,
+                    connection: edge.data.connection as ConnectionRef,
+                    inline: true,
+                  });
+              } else if (
+                !change.selected &&
+                state.selection?.kind === "connection" &&
+                state.selection.id === change.id
+              )
+                state.select(null);
+            }
+        }}
+        onEdgeClick={(_, edge) => {
+          if (present === null && view === "canvas")
+            s.select({
+              kind: "connection",
+              id: edge.id,
+              connection: edge.data?.connection as ConnectionRef,
+              inline: true,
+            });
+        }}
+        edgesReconnectable={false}
+        elementsSelectable={present === null && view === "canvas"}
+        edgesFocusable={present === null && view === "canvas"}
+        reconnectRadius={10 / viewport.zoom}
+        onReconnectStart={(_, edge) => {
+          reconnecting.current = edge.data?.connection as ConnectionRef;
+        }}
+        onReconnect={(edge, connection) => {
+          const original = edge.data?.connection as ConnectionRef | undefined,
+            source = cardSource(
+              flow.getNode(connection.source)?.data as CardData | undefined,
+            ),
+            target = cardTarget(
+              flow.getNode(connection.target)?.data as CardData | undefined,
+            );
+          if (
+            original &&
+            source &&
+            target &&
+            reconnectCardLink(original, source, target)
+          ) {
+            const ref = { source, target };
+            s.select({
+              kind: "connection",
+              id: connectionEdgeId(connection.source, connection.target, ref),
+              connection: ref,
+              inline: true,
+            });
+            notify(t("linkUpdated"));
+          }
+        }}
+        onReconnectEnd={() => {
+          reconnecting.current = null;
+        }}
         onNodesChange={onChanges}
         onNodeDragStop={onDragStop}
         nodesDraggable={
@@ -2419,7 +2563,7 @@ function EditorInner() {
                 </aside>
               </ResponsivePanel>
             ) : null}
-            {j && s.selection ? (
+            {j && s.selection && s.selection.kind !== "connection" ? (
               <ResponsivePanel
                 narrow={narrow}
                 open={sheet === "details"}

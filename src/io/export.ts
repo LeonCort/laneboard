@@ -14,6 +14,18 @@ export function download(name: string, blob: Blob) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function markWorkspaceExport() {
+  const history = useStore.temporal.getState(),
+    wasTracking = history.isTracking;
+  history.pause();
+  try {
+    useStore.getState().edit((w) => {
+      w.settings.lastExport = new Date().toISOString();
+    });
+  } finally {
+    if (wasTracking) history.resume();
+  }
+}
 export function exportJSON(whole = false) {
   const s = useStore.getState();
   const data: FileData = {
@@ -29,10 +41,7 @@ export function exportJSON(whole = false) {
       : `${data.journeys[0]?.id || "journey"}.laneboard.json`,
     new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
   );
-  if (whole)
-    s.edit((w) => {
-      w.settings.lastExport = new Date().toISOString();
-    });
+  if (whole) markWorkspaceExport();
 }
 const csvCell = (s: unknown) => {
   let value = String(s ?? "");
@@ -115,6 +124,7 @@ export async function exportImage(type: "png" | "svg", scale: number) {
     filter: (n: HTMLElement) =>
       !n.classList?.contains("react-flow__panel") &&
       !n.classList?.contains("react-flow__minimap") &&
+      !n.classList?.contains("react-flow__edgeupdater") &&
       !n.classList?.contains("lb-canvas-ui") &&
       !n.classList?.contains("lb-island"),
   };
@@ -171,7 +181,5 @@ export async function saveToDisk() {
     ),
   );
   await file.close();
-  useStore.getState().edit((w) => {
-    w.settings.lastExport = new Date().toISOString();
-  });
+  markWorkspaceExport();
 }

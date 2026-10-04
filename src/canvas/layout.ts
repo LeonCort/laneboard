@@ -6,7 +6,8 @@ import {
 } from "../model/analysis";
 import { MarkerType, type Node, type Edge } from "@xyflow/react";
 import type { Journey, Mode, Layer, UIState } from "../model/schema";
-import { visibleSteps, evaluateService } from "../rules";
+import { visibleSteps, stepTargets, evaluateService } from "../rules";
+import { canEditConnection, type ConnectionRef } from "../model/connections";
 import type { Selection } from "../store";
 export interface CardData extends Record<string, unknown> {
   kind: Selection["kind"];
@@ -356,21 +357,30 @@ export function layout(
     const rendered = steps.filter((s) =>
       nodes.some((n) => n.id === `step-${s.id}-${s.lane}`),
     );
-    rendered.forEach((s, i) => {
-      if (!i) return;
-      const prev = rendered[i - 1],
-        transition = s.transition[mode] || "channel-switch";
-      edges.push({
-        id: `edge-${prev.id}-${s.id}`,
-        source: `step-${prev.id}-${prev.lane}`,
-        target: `step-${s.id}-${s.lane}`,
-        sourceHandle: "out",
-        targetHandle: "in",
-        type: "journey",
-        data: { transition, dimmed: dimJourney },
-        zIndex: 6,
-      });
-    });
+    rendered.forEach((prev) =>
+      stepTargets(j, prev.id, mode).forEach((id) => {
+        const s = rendered.find((step) => step.id === id);
+        if (!s) return;
+        const transition = s.transition[mode] || "channel-switch";
+        edges.push({
+          id: `edge-${prev.id}-${s.id}`,
+          source: `step-${prev.id}-${prev.lane}`,
+          target: `step-${s.id}-${s.lane}`,
+          sourceHandle: "out",
+          targetHandle: "in",
+          type: "journey",
+          data: {
+            transition,
+            dimmed: dimJourney,
+            connection: {
+              source: { kind: "step", id: prev.id, lane: prev.lane },
+              target: { kind: "step", id: s.id },
+            },
+          },
+          zIndex: 6,
+        });
+      }),
+    );
   }
   if (active.has("services")) {
     const rendered = nodes.filter(
@@ -414,6 +424,14 @@ export function layout(
             data: {
               transition: "service",
               dimmed: source.dimmed || target.data.dimmed,
+              connection: {
+                source: {
+                  kind: "service",
+                  id: source.entityId,
+                  lane: source.lane,
+                },
+                target: { kind: "service", id: String(target.data.entityId) },
+              },
             },
             markerEnd: { type: MarkerType.ArrowClosed, color: "var(--accent)" },
             zIndex: 4,
@@ -436,7 +454,13 @@ export function layout(
           sourceHandle: "out",
           targetHandle: "in",
           type: "journey",
-          data: { transition: f.kind },
+          data: {
+            transition: f.kind,
+            connection: {
+              source: { kind: "feed", id: f.id, lane: f.lane },
+              target: { kind: "step", id: to.id },
+            },
+          },
           zIndex: 6,
         });
     }
@@ -478,11 +502,22 @@ export function layout(
       width: Number(node.style?.width),
       height: Number(node.style?.height),
     })),
-    edges: edges.map((edge) => ({
-      ...edge,
-      selectable: false,
-      focusable: false,
-    })),
+    edges: edges.map<Edge>((edge) => {
+      const connection = edge.data!.connection as ConnectionRef,
+        selected = selection?.kind === "connection" && selection.id === edge.id;
+      return {
+        ...edge,
+        selectable: true,
+        focusable: true,
+        selected,
+        reconnectable: selected && canEditConnection(j, connection, mode),
+        zIndex: selected ? 20 : edge.zIndex,
+        data: {
+          ...edge.data,
+          readOnly: !canEditConnection(j, connection, mode),
+        },
+      };
+    }),
     rows,
     columns,
     width: totalWidth,

@@ -65,6 +65,7 @@ export function targetSignature(j: Journey) {
         s.textTarget || s.text,
         s.transition.target,
         s.notes.target,
+        s.next?.target,
       ]),
     experience: j.experience.target,
     recommendations: j.frictions.map((f) => [f.id, f.recommendation]),

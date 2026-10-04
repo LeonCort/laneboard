@@ -47,7 +47,7 @@ export function Inspector({
     j = currentJourney(s),
     sel = s.selection,
     mode = s.workspace.ui.mode;
-  if (!j) return null;
+  if (!j || sel?.kind === "connection") return null;
   const edit = s.editJourney,
     disabled =
       j.readOnly || (mode === "target" && targetState(j) === "not-started");
@@ -705,6 +705,9 @@ export function Inspector({
                       }
                       disabled={disabled}
                     >
+                      {!feed.to ? (
+                        <option value="">{t("notConnected")}</option>
+                      ) : null}
                       {j.steps.map((x, i) => (
                         <option key={x.id} value={x.id}>
                           {i + 1}. {x.text}

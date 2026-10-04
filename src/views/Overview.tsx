@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { useStore, currentJourney, type Selection } from "../store";
 import { useT, type Key } from "../i18n";
-import { kpis, visibleSteps, evaluateService } from "../rules";
+import { kpis, visibleSteps, stepTargets, evaluateService } from "../rules";
 import { evidenceState, frictionReference } from "../model/analysis";
 import { TargetReview } from "../ui/Workflow";
 export function Overview({
@@ -38,14 +38,16 @@ export function Overview({
   );
   const owners = s.workspace.owners.filter((o) => ownerIds.has(o.id));
   const steps = visibleSteps(j, mode);
-  const handoffs = steps.slice(1).flatMap((step, i) => {
-    const previous = steps[i],
-      from = j.lanes.find((l) => l.id === previous.lane),
-      to = j.lanes.find((l) => l.id === step.lane);
-    return from?.owner && to?.owner && from.owner !== to.owner
-      ? [{ step, from, to }]
-      : [];
-  });
+  const handoffs = steps.flatMap((previous) =>
+    stepTargets(j, previous.id, mode).flatMap((id) => {
+      const step = steps.find((s) => s.id === id)!,
+        from = j.lanes.find((l) => l.id === previous.lane),
+        to = j.lanes.find((l) => l.id === step.lane);
+      return from?.owner && to?.owner && from.owner !== to.owner
+        ? [{ step, from, to }]
+        : [];
+    }),
+  );
   const ownerName = (id?: string) =>
     s.workspace.owners.find((o) => o.id === id)?.name || t("unassigned");
   const friction = (f: (typeof j.frictions)[number]) => (

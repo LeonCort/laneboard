@@ -20,11 +20,13 @@ export function CardLinks({
   name,
   connectable,
   readOnly,
+  receive,
 }: {
   source: LinkSource;
   name: string;
   connectable: boolean;
   readOnly: boolean;
+  receive: boolean;
 }) {
   const t = useT(),
     j = useStore(currentJourney),
@@ -69,7 +71,7 @@ export function CardLinks({
         className="lb-link-handle nodrag nopan lb-canvas-ui"
         isConnectable={connectable && !blocked}
         isConnectableStart={connectable && !blocked}
-        isConnectableEnd={false}
+        isConnectableEnd={receive}
         data-open={open}
         style={{ transform: `translate(50%, -50%) scale(${1 / zoom})` }}
       >
@@ -130,14 +132,26 @@ export function CardLinks({
         >
           <div className="lb-link-header">
             <strong id={titleId}>
-              {t(source.kind === "service" ? "linkService" : "linkFeed")}
+              {t(
+                source.kind === "service"
+                  ? "linkService"
+                  : source.kind === "step"
+                    ? "linkSteps"
+                    : "linkFeed",
+              )}
             </strong>
             <Popover.Close className="lb-iconbtn" aria-label={t("close")}>
               <X size={16} />
             </Popover.Close>
           </div>
           <p className="lb-field__hint">
-            {t(source.kind === "service" ? "linkServiceHint" : "linkFeedHint")}
+            {t(
+              source.kind === "service"
+                ? "linkServiceHint"
+                : source.kind === "step"
+                  ? "linkStepsHint"
+                  : "linkFeedHint",
+            )}
           </p>
           {blocked ? (
             <div className="lb-link-blocked">
@@ -184,7 +198,7 @@ export function CardLinks({
                       j.phases.find((phase) => phase.id === item.phase)?.name ||
                       "",
                     lane = j.lanes.find((lane) => lane.id === item.lane)?.name;
-                  const linked = hasCardLink(j, source, item.target);
+                  const linked = hasCardLink(j, source, item.target, mode);
                   return (
                     <Command.Item
                       key={item.target.id}

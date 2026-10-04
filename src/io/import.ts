@@ -218,7 +218,24 @@ export function parseImport(raw: string): {
     j.frictions.forEach((f, i) =>
       ref(f.owner, owners, `${p}.frictions[${i}].owner`),
     );
-    j.feeds.forEach((f, i) => ref(f.to, steps, `${p}.feeds[${i}].to`));
+    j.feeds.forEach((f, i) => {
+      if (f.to) ref(f.to, steps, `${p}.feeds[${i}].to`);
+    });
+    j.steps.forEach((step, i) => {
+      for (const mode of ["now", "target"] as const)
+        step.next?.[mode]?.forEach((id, k) => {
+          const path = `${p}.steps[${i}].next.${mode}[${k}]`;
+          ref(id, steps, path);
+          const target = j.steps.find((s) => s.id === id);
+          if (
+            id === step.id ||
+            (target && target.in !== "both" && target.in !== mode)
+          )
+            errors.push(
+              `${path}: Connections must lead to another step in the same map mode.`,
+            );
+        });
+    });
     j.sketches.forEach((s, i) => {
       if (s.anchor) {
         ref(s.anchor.lane, lanes, `${p}.sketches[${i}].anchor.lane`);

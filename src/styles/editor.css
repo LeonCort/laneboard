@@ -291,7 +291,87 @@
   opacity: 0.75;
 }
 .lb-edge {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.react-flow__edge-interaction {
+  cursor: pointer;
+  pointer-events: stroke;
+}
+.react-flow__edge.selectable:hover .lb-edge {
+  stroke-width: 3;
+  opacity: 1;
+}
+.react-flow__edge.selected .lb-edge {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: none;
+  opacity: 1;
+}
+.react-flow__edgeupdater {
+  fill: var(--bg-panel);
+  stroke: var(--accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: grab;
+}
+/* Keep both handles on their endpoints, including short adjacent-card links. */
+.react-flow__edgeupdater-source {
+  transform: translateX(calc(-1 * var(--lb-reconnect-radius)));
+}
+.react-flow__edgeupdater-target {
+  transform: translateX(var(--lb-reconnect-radius));
+}
+.lb-card[data-reconnect-source="true"] .lb-link-target {
   pointer-events: none;
+}
+.lb-card[data-reconnect-source="true"] .lb-link-handle {
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  transform: none !important;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: auto;
+}
+.lb-card[data-reconnect-source="true"] .lb-link-handle button {
+  pointer-events: none;
+}
+.lb-edge-controls {
+  position: absolute;
+  width: 300px;
+  padding: 12px;
+  pointer-events: auto;
+  z-index: 30;
+}
+.react-flow__edgelabel-renderer {
+  z-index: 30;
+}
+.lb-edge-controls__name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.lb-edge-controls p {
+  font-size: 11px;
+  margin: 6px 0 10px;
+  color: var(--text-muted);
+}
+.lb-edge-controls__actions {
+  display: flex;
+  gap: 6px;
+}
+.lb-edge-controls__actions .lb-btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.lb-edge-controls__delete {
+  color: var(--crit);
 }
 .lb-link-popover {
   width: 340px;

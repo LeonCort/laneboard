@@ -8,6 +8,7 @@ import {
   getSmoothStepPath,
   useViewport,
   useConnection,
+  useUpdateNodeInternals,
   type NodeProps,
   type EdgeProps,
   type Node,
@@ -24,6 +25,8 @@ import {
   hasCardLink,
 } from "../model/connections";
 import { CardLinks } from "./CardLinks";
+import { EdgeControls } from "./EdgeControls";
+import type { ConnectionRef } from "../model/connections";
 import { useT } from "../i18n";
 import type { CardData, CellData } from "./layout";
 import type { Key } from "../i18n";
@@ -126,6 +129,7 @@ export const CellNode = memo(function CellNode({
   );
 });
 export const CardNode = memo(function CardNode({
+  id,
   data,
   selected,
   isConnectable,
@@ -139,20 +143,35 @@ export const CardNode = memo(function CardNode({
     mode = useStore((s) => s.workspace.ui.mode);
   const source = cardSource(data),
     target = cardTarget(data);
-  const canReceive = useConnection((connection) => {
+  const receive = useConnection((connection) => {
+    const backwards = connection.fromHandle?.type === "target";
     const from =
       connection.fromNode?.type === "card"
-        ? cardSource(connection.fromNode.data as CardData)
+        ? backwards
+          ? source
+          : cardSource(connection.fromNode.data as CardData)
         : null;
-    return !!(
+    const to = backwards
+      ? cardTarget(connection.fromNode?.data as CardData | undefined)
+      : target;
+    const valid = !!(
       isConnectable &&
       journey &&
       from &&
-      target &&
-      canConnectCards(journey, from, target, mode) &&
-      !hasCardLink(journey, from, target)
+      to &&
+      canConnectCards(journey, from, to, mode) &&
+      !hasCardLink(journey, from, to, mode)
     );
+    return valid ? (backwards ? "source" : "target") : "none";
   });
+  const canReceive = receive !== "none";
+  const { zoom } = useViewport(),
+    updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    // The hover control keeps its screen size, and drag targets expand to the
+    // whole card. Re-measure these handles whenever their geometry changes.
+    updateNodeInternals(id);
+  }, [id, zoom, receive, updateNodeInternals]);
   const commit = () => {
     edit((j) => {
       if (data.kind === "service") {
@@ -197,6 +216,7 @@ export const CardNode = memo(function CardNode({
       data-dimmed={data.dimmed}
       data-selected={selected}
       data-link-target={canReceive}
+      data-reconnect-source={receive === "source"}
       data-owned={data.showOwner}
       data-owner-index={owners.findIndex((o) => o.id === data.owner) + 1}
     >
@@ -207,7 +227,7 @@ export const CardNode = memo(function CardNode({
         className="lb-handle lb-link-target"
         isConnectable={isConnectable}
         isConnectableStart={false}
-        isConnectableEnd={canReceive}
+        isConnectableEnd={receive === "target"}
       />
       {data.kind === "step" ? (
         <span className="lb-card__num">{data.number}</span>
@@ -276,6 +296,7 @@ export const CardNode = memo(function CardNode({
           name={data.text}
           connectable={isConnectable}
           readOnly={data.readOnly}
+          receive={receive === "source"}
         />
       ) : (
         <Handle
@@ -304,7 +325,7 @@ export const JourneyEdge = memo(function JourneyEdge(props: EdgeProps) {
         path={path}
         className={`lb-edge lb-edge--${transition}${props.data?.dimmed ? " is-dimmed" : ""}`}
         markerEnd={props.markerEnd}
-        interactionWidth={0}
+        interactionWidth={24}
       />
       {transition === "restart" ? (
         <EdgeLabelRenderer>
@@ -317,6 +338,20 @@ export const JourneyEdge = memo(function JourneyEdge(props: EdgeProps) {
           >
             {t("restarts")}
           </span>
+        </EdgeLabelRenderer>
+      ) : null}
+      {props.selected && props.data?.connection ? (
+        <EdgeLabelRenderer>
+          <EdgeControls
+            id={props.id}
+            connection={props.data.connection as ConnectionRef}
+            sourceNode={props.source}
+            targetNode={props.target}
+            x={x}
+            sourceY={props.sourceY}
+            targetY={props.targetY}
+            disabled={!!props.data.readOnly}
+          />
         </EdgeLabelRenderer>
       ) : null}
     </>

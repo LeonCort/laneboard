@@ -14,6 +14,11 @@ import {
 } from "../model/schema";
 import { loadWorkspace, saveWorkspace } from "../persistence/db";
 import { targetSignature, targetState } from "../model/analysis";
+import {
+  applyCardLink,
+  canEditConnection,
+  type ConnectionRef,
+} from "../model/connections";
 export type Selection = {
   kind:
     | "service"
@@ -26,11 +31,13 @@ export type Selection = {
     | "phase"
     | "journey"
     | "group"
+    | "connection"
     | "cell";
   id: string;
   lane?: string;
   phase?: string;
   inline?: boolean;
+  connection?: ConnectionRef;
 };
 interface State {
   workspace: Workspace;
@@ -446,6 +453,10 @@ export function createTargetFromNow() {
       s.textTarget = s.text;
       s.transition.target = s.transition.now;
       s.notes.target = s.notes.now;
+      if (s.next) {
+        if (s.next.now) s.next.target = [...s.next.now];
+        else delete s.next.target;
+      }
     });
     j.experience.target = [...j.experience.now];
     j.targetState = "draft";
@@ -499,6 +510,18 @@ export function deleteSelection() {
   const s = useStore.getState();
   const sel = s.selection;
   if (!sel) return;
+  if (sel.kind === "connection") {
+    const j = currentJourney(s),
+      ref = sel.connection,
+      mode = s.workspace.ui.mode;
+    if (j && ref && canEditConnection(j, ref, mode)) {
+      s.editJourney((journey) =>
+        applyCardLink(journey, ref.source, ref.target, false, mode),
+      );
+      s.select(null);
+    }
+    return;
+  }
   s.editJourney((j) => {
     const ids = new Set(s.selectedIds.length ? s.selectedIds : [sel.id]);
     j.services = j.services.filter((x) => !ids.has(x.id));
@@ -506,6 +529,11 @@ export function deleteSelection() {
       (x) => (x.linksTo = x.linksTo.filter((id) => !ids.has(id))),
     );
     j.steps = j.steps.filter((x) => !ids.has(x.id));
+    j.steps.forEach((step) => {
+      for (const mode of ["now", "target"] as const)
+        if (step.next?.[mode])
+          step.next[mode] = step.next[mode]!.filter((id) => !ids.has(id));
+    });
     j.feeds = j.feeds.filter((x) => !ids.has(x.id) && !ids.has(x.to));
     j.frictions = j.frictions.filter((x) => !ids.has(x.id));
     j.notes = j.notes.filter((x) => !ids.has(x.id));

@@ -102,6 +102,20 @@ export function visibleSteps(journey: Journey, mode: Mode) {
   if (mode === "target" && targetState(journey) === "not-started") mode = "now";
   return journey.steps.filter((s) => s.in === "both" || s.in === mode);
 }
+export function stepTargets(journey: Journey, source: string, mode: Mode) {
+  if (mode === "target" && targetState(journey) === "not-started") mode = "now";
+  const steps = visibleSteps(journey, mode),
+    index = steps.findIndex((step) => step.id === source);
+  if (index < 0) return [];
+  const override = steps[index].next?.[mode];
+  return override === undefined
+    ? steps[index + 1]
+      ? [steps[index + 1].id]
+      : []
+    : [...new Set(override)].filter(
+        (id) => id !== source && steps.some((step) => step.id === id),
+      );
+}
 export function kpis(journey: Journey, mode: Mode) {
   if (mode === "target" && targetState(journey) === "not-started") mode = "now";
   const steps = visibleSteps(journey, mode),
@@ -120,8 +134,12 @@ export function kpis(journey: Journey, mode: Mode) {
     }),
   );
   return {
-    restarts: steps.filter((s, i) => i > 0 && s.transition[mode] === "restart")
-      .length,
+    restarts: steps
+      .flatMap((step) => stepTargets(journey, step.id, mode))
+      .filter(
+        (id) =>
+          steps.find((step) => step.id === id)?.transition[mode] === "restart",
+      ).length,
     frictions: journey.frictions.length,
     coverage: applicable ? Math.round((native / applicable) * 100) : 0,
     native,

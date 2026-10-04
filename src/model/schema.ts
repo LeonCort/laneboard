@@ -111,6 +111,10 @@ export const stepSchema = z.object({
     .default({}),
   text,
   textTarget: text.optional(),
+  // Omitted means the next ordered step; an empty list explicitly ends the path.
+  next: z
+    .object({ now: z.array(id).optional(), target: z.array(id).optional() })
+    .optional(),
   notes: z
     .object({ now: text.optional(), target: text.optional() })
     .default({}),
@@ -132,7 +136,7 @@ export const feedSchema = z.object({
   kind: z.enum(["entry", "support"]),
   lane: id,
   phase: id,
-  to: id,
+  to: z.union([id, z.literal("")]).default(""),
   text,
   explanation: text.default(""),
 });

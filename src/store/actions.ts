@@ -2,6 +2,9 @@ import { currentJourney, useStore, type Selection } from ".";
 import {
   canConnectCards,
   hasCardLink,
+  applyCardLink,
+  canReconnectConnection,
+  type ConnectionRef,
   type LinkSource,
   type LinkTarget,
 } from "../model/connections";
@@ -26,20 +29,32 @@ export function setCardLink(
     !canConnectCards(journey, source, target, store.workspace.ui.mode)
   )
     return false;
-  if (source.kind === "feed" && !linked) return false;
-  if (hasCardLink(journey, source, target) === linked) return false;
+  if (hasCardLink(journey, source, target, store.workspace.ui.mode) === linked)
+    return false;
+  store.editJourney((j) =>
+    applyCardLink(j, source, target, linked, store.workspace.ui.mode),
+  );
+  return true;
+}
+
+export function reconnectCardLink(
+  original: ConnectionRef,
+  source: LinkSource,
+  target: LinkTarget,
+) {
+  const store = useStore.getState(),
+    journey = currentJourney(store),
+    mode = store.workspace.ui.mode;
+  if (
+    !journey ||
+    !canReconnectConnection(journey, original, source, target, mode)
+  )
+    return false;
   store.editJourney((j) => {
-    if (source.kind === "service") {
-      const service = j.services.find((s) => s.id === source.id)!;
-      service.linksTo = linked
-        ? [...service.linksTo, target.id]
-        : service.linksTo.filter((id) => id !== target.id);
-      if (linked) {
-        service.isolated = false;
-        service.flowAssessment = "connected";
-      }
-    } else j.feeds.find((feed) => feed.id === source.id)!.to = target.id;
+    applyCardLink(j, original.source, original.target, false, mode);
+    applyCardLink(j, source, target, true, mode);
   });
+  store.select(null);
   return true;
 }
 
@@ -215,7 +230,7 @@ export function removeStructure(sel: Selection) {
       (s) =>
         j.lanes.some((l) => l.id === s.lane) &&
         j.phases.some((p) => p.id === s.phase) &&
-        j.steps.some((x) => x.id === s.to),
+        (!s.to || j.steps.some((x) => x.id === s.to)),
     );
     j.notes = j.notes.filter(
       (s) =>
@@ -229,6 +244,13 @@ export function removeStructure(sel: Selection) {
           !j.phases.some((p) => p.id === s.anchor?.phase))
       )
         delete s.anchor;
+    });
+    j.steps.forEach((step) => {
+      for (const mode of ["now", "target"] as const)
+        if (step.next?.[mode])
+          step.next[mode] = step.next[mode]!.filter((id) =>
+            j.steps.some((s) => s.id === id),
+          );
     });
   });
   useStore.getState().select(null);
@@ -302,6 +324,13 @@ export async function pasteCards(useSystem = true) {
     if (Array.isArray(item.linksTo))
       item.linksTo = item.linksTo.map((id) => ids.get(String(id)) || id);
     if (typeof item.to === "string") item.to = ids.get(item.to) || item.to;
+    if (item.next && typeof item.next === "object") {
+      for (const mode of ["now", "target"] as const) {
+        const next = item.next as Record<string, unknown>;
+        if (Array.isArray(next[mode]))
+          next[mode] = next[mode].map((id) => ids.get(String(id)) || id);
+      }
+    }
     if (row.kind === "sketches") {
       item.x = Number(item.x) + 24;
       item.y = Number(item.y) + 24;
