@@ -7,6 +7,57 @@ async function openJourney(page: Page) {
   await expect(page.locator(".lb-sticky-phase")).toHaveCount(6);
 }
 
+test("navigation remains available when tools close and can reopen them", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1126, height: 780 });
+  await openJourney(page);
+  const before = await page
+    .locator(".react-flow__viewport")
+    .getAttribute("style");
+  const rail = page.getByRole("navigation", { name: "Workspace tools" });
+  await rail.getByRole("button", { name: "Collapse interface" }).click();
+  await expect(page.locator(".lb-leftpanel")).toHaveCount(0);
+  await expect(page.locator(".lb-inspector")).toHaveCount(0);
+  await expect(page.locator(".lb-dock")).toHaveCount(0);
+  for (const name of [
+    "Journeys",
+    "Library",
+    "Definitions",
+    "Create with AI",
+    "Settings",
+    "Expand tools",
+  ]) {
+    await expect(rail.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  const railBox = await rail.boundingBox(),
+    labels = await page.locator(".lb-lane-overlay").boundingBox();
+  expect(labels!.x).toBeGreaterThan(railBox!.x + railBox!.width);
+  await rail.getByRole("button", { name: "Expand tools" }).click();
+  await expect(page.locator(".lb-leftpanel")).toBeVisible();
+  await expect(page.locator(".lb-inspector")).toBeVisible();
+  await expect(page.locator(".lb-dock")).toBeVisible();
+  await expect(page.locator(".react-flow__viewport")).toHaveAttribute(
+    "style",
+    before!,
+  );
+  await page.keyboard.press("ControlOrMeta+\\");
+  await rail.getByRole("button", { name: "Library", exact: true }).click();
+  await expect(page.locator(".lb-leftpanel .lb-library-grid")).toBeVisible();
+  await rail.getByRole("button", { name: "Collapse interface" }).click();
+  await rail.getByRole("button", { name: "Definitions", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Definitions" })).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await rail.getByRole("button", { name: "Journeys", exact: true }).click();
+  await expect(page.locator(".lb-leftpanel")).toContainText(
+    "Small business owner starts investing",
+  );
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+});
+
 async function checkColumnAlignment(page: Page) {
   await expect
     .poll(() =>

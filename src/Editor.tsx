@@ -55,6 +55,7 @@ import {
   Maximize,
   HelpCircle,
   PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Table2,
   GripVertical,
@@ -176,7 +177,7 @@ function EditorInner() {
     guideRef = useRef<HTMLDivElement>(null),
     fileRef = useRef<HTMLInputElement>(null);
   const leftX =
-      present !== null || collapsed ? 16 : canvasSize.width <= 960 ? 84 : 340,
+      present !== null ? 16 : collapsed || canvasSize.width <= 960 ? 84 : 340,
     rightInset =
       present !== null || collapsed || canvasSize.width <= 960 ? 16 : 304,
     labelWidth = present !== null ? 132 : 108,
@@ -590,7 +591,7 @@ function EditorInner() {
     },
     {
       id: "ui",
-      label: t("toggleUI"),
+      label: t(collapsed ? "expandUI" : "toggleUI"),
       run: () => setCollapsed((v) => !v),
       shortcut: "⌘ \\",
     },
@@ -1180,7 +1181,10 @@ function EditorInner() {
                   },
                   { label: t("backup"), run: () => exportJSON(true) },
                   { label: t("settings"), run: () => setDialog("settings") },
-                  { label: t("toggleUI"), run: () => setCollapsed((v) => !v) },
+                  {
+                    label: t(collapsed ? "expandUI" : "toggleUI"),
+                    run: () => setCollapsed((v) => !v),
+                  },
                 ].map((a) => (
                   <Menu.Item
                     key={t(a.label)}
@@ -1244,7 +1248,7 @@ function EditorInner() {
             {t("export")}
           </button>
         </Panel>
-        {present === null && !collapsed && view === "canvas" ? (
+        {present === null && view === "canvas" ? (
           <>
             <nav
               className="lb-island lb-rail lb-rail-position"
@@ -1255,13 +1259,19 @@ function EditorInner() {
                   id: "journeys",
                   key: "journeys",
                   icon: Layers,
-                  run: () => setRail("journeys"),
+                  run: () => {
+                    setRail("journeys");
+                    setCollapsed(false);
+                  },
                 },
                 {
                   id: "library",
                   key: "library",
                   icon: Library,
-                  run: () => setRail("library"),
+                  run: () => {
+                    setRail("library");
+                    setCollapsed(false);
+                  },
                 },
                 {
                   id: "definitions",
@@ -1285,7 +1295,7 @@ function EditorInner() {
                 <button
                   className="lb-rail__btn"
                   key={a.id}
-                  aria-pressed={rail === a.id}
+                  aria-pressed={!collapsed && rail === a.id}
                   aria-label={t(a.key as Key)}
                   onClick={a.run}
                 >
@@ -1296,13 +1306,15 @@ function EditorInner() {
               <div className="lb-rail__sep" />
               <button
                 className="lb-rail__btn"
-                aria-label={t("toggleUI")}
-                onClick={() => setCollapsed(true)}
+                aria-label={t(collapsed ? "expandUI" : "toggleUI")}
+                aria-expanded={!collapsed}
+                onClick={() => setCollapsed((value) => !value)}
               >
-                <PanelLeftClose />
+                {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+                {t(collapsed ? "expand" : "close")}
               </button>
             </nav>
-            {j ? (
+            {j && !collapsed ? (
               <aside
                 className="lb-island lb-leftpanel lb-left-position"
                 aria-label="Journeys and layers"
@@ -1684,7 +1696,7 @@ function EditorInner() {
                 )}
               </aside>
             ) : null}
-            {j ? (
+            {j && !collapsed ? (
               <Inspector
                 confirm={confirm}
                 ownerFilter={owner}

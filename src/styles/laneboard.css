@@ -944,8 +944,7 @@ kbd,
   border-radius: var(--radius-pill);
 }
 
-/* Collapsed UI (Cmd/Ctrl + \): only file pill, top-right cluster, dock and zoom remain */
-:root[data-ui="collapsed"] .lb-rail,
+/* Closed tools leave the navigation and its expand control available. */
 :root[data-ui="collapsed"] .lb-leftpanel,
 :root[data-ui="collapsed"] .lb-inspector,
 :root[data-ui="collapsed"] .lb-drawer {
