@@ -44,7 +44,7 @@ This is a Vite static site. `vercel.json` defines the build, output directory, C
 - `src/persistence`: Dexie and serialized autosave.
 - `src/io`: validation, JSON/CSV and local image export.
 - `src/canvas`: derived grid layout, React Flow nodes and typed edges, rough.js sketches.
-- `src/views`: inspector and resizable data drawer.
+- `src/views`: inspector, resizable data drawer and dedicated Overview view.
 - `src/ai`: local prompt template with schema and example.
 - `src/i18n`: English and Swedish interface strings.
 - `src/examples`: two fictional Example Bank journeys.

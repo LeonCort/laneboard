@@ -13,8 +13,7 @@ import { useT } from "../i18n";
 import { evaluateService, visibleSteps } from "../rules";
 import { statuses, transitions, type Status } from "../model/schema";
 import { exportCSV } from "../io/export";
-export type Tab =
-  "services" | "frictions" | "capabilities" | "steps" | "overview";
+export type Tab = "services" | "frictions" | "capabilities" | "steps";
 export function Drawer({
   tab,
   setTab,
@@ -30,7 +29,6 @@ export function Drawer({
     t = useT(),
     j = currentJourney(s),
     [height, setHeight] = useState(320),
-    [diagram, setDiagram] = useState(0),
     drag = useRef("");
   if (!j) return null;
   const mode = s.workspace.ui.mode,
@@ -83,24 +81,16 @@ export function Drawer({
       />
       <div className="lb-drawer__head">
         <div className="lb-tabs" role="tablist" aria-label="Data views">
-          {(
-            [
-              "services",
-              "frictions",
-              "capabilities",
-              "steps",
-              "overview",
-            ] as const
-          ).map((key) => (
-            <button
-              key={key}
-              role="tab"
-              className="lb-tab"
-              aria-selected={tab === key}
-              onClick={() => setTab(key)}
-            >
-              {t(key)}
-              {key !== "overview" ? (
+          {(["services", "frictions", "capabilities", "steps"] as const).map(
+            (key) => (
+              <button
+                key={key}
+                role="tab"
+                className="lb-tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+              >
+                {t(key)}
                 <span className="lb-tab__count">
                   {key === "capabilities"
                     ? caps.length
@@ -108,9 +98,9 @@ export function Drawer({
                       ? visibleSteps(j, mode).length
                       : j[key].length}
                 </span>
-              ) : null}
-            </button>
-          ))}
+              </button>
+            ),
+          )}
         </div>
         <div className="lb-dialog-actions">
           {tab === "services" || tab === "frictions" ? (
@@ -482,74 +472,6 @@ export function Drawer({
               ))}
             </tbody>
           </table>
-        ) : null}
-        {tab === "overview" ? (
-          <>
-            <div className="lb-overview-diagram">
-              <div className="lb-segmented">
-                {[t("silos"), t("crossCutting"), t("sharedGoal")].map(
-                  (label, i) => (
-                    <button
-                      key={i}
-                      aria-pressed={diagram === i}
-                      onClick={() => setDiagram(i)}
-                    >
-                      {label}
-                    </button>
-                  ),
-                )}
-              </div>
-              <div className="lb-silo-row">
-                {[
-                  "Products",
-                  "Private banking",
-                  "Business banking",
-                  "Channels",
-                  "Service & advice",
-                  "Technology",
-                ].map((label) => (
-                  <div className="lb-silo" key={label}>
-                    {label}
-                    <span>
-                      {diagram === 0
-                        ? t("localObjectives")
-                        : diagram === 1
-                          ? t("connectedFunction")
-                          : j.goal || t("oneJourneyLabel")}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {diagram > 0 ? (
-                <div className="lb-cross-cutting">
-                  {diagram === 1
-                    ? t("experienceFunction")
-                    : j.goal || t("sharedGoal")}
-                </div>
-              ) : null}
-            </div>
-            <div className="lb-view-grid">
-              {s.workspace.owners.map((o, i) => (
-                <div className="lb-view-card" key={o.id}>
-                  <span className="lb-owner-tag" data-owner-index={(i % 6) + 1}>
-                    {o.name}
-                  </span>
-                  <p className="lb-field__hint">{o.description}</p>
-                  {j.frictions
-                    .filter((f) => f.owner === o.id)
-                    .map((f) => (
-                      <button
-                        className="lb-row-link"
-                        key={f.id}
-                        onClick={() => onSelect({ kind: "friction", id: f.id })}
-                      >
-                        {f.id} · {f.title}
-                      </button>
-                    ))}
-                </div>
-              ))}
-            </div>
-          </>
         ) : null}
       </div>
     </section>

@@ -14,6 +14,8 @@ import {
   Panel,
   useReactFlow,
   useViewport,
+  getNodesBounds,
+  getViewportForBounds,
   applyNodeChanges,
   type Node,
   type NodeChange,
@@ -25,7 +27,6 @@ import {
   SlidersHorizontal,
   Sparkles,
   Settings,
-  Network,
   Plus,
   ChevronDown,
   ChevronLeft,
@@ -84,6 +85,7 @@ import { layout, type CardData, type CellData } from "./canvas/layout";
 import { nodeTypes, edgeTypes } from "./canvas/nodes";
 import { Inspector } from "./views/Inspector";
 import { Drawer, type Tab } from "./views/Drawer";
+import { Overview } from "./views/Overview";
 import { presentationFor } from "./present";
 import { layers, newId, type Layer } from "./model/schema";
 import { exportJSON, exportImage, exportCSV } from "./io/export";
@@ -137,6 +139,12 @@ function EditorInner() {
   const [dialog, setDialog] = useState<DialogName>(null),
     [importRaw, setImportRaw] = useState<string>(),
     [drawer, setDrawer] = useState<Tab | null>(null),
+    [view, setView] = useState<"canvas" | "overview">("canvas"),
+    [canvasSize, setCanvasSize] = useState({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }),
+    [guideHeight, setGuideHeight] = useState(100),
     [rail, setRail] = useState("journeys"),
     [tool, setTool] = useState("select"),
     [editorMode, setEditorMode] = useState<"map" | "sketch">("map"),
@@ -162,8 +170,43 @@ function EditorInner() {
     originalPresent = useRef<{
       layers: Layer[];
       viewport: typeof viewport;
+      view: "canvas" | "overview";
     } | null>(null),
+    editorRef = useRef<HTMLElement>(null),
+    guideRef = useRef<HTMLDivElement>(null),
     fileRef = useRef<HTMLInputElement>(null);
+  const leftX =
+      present !== null || collapsed ? 16 : canvasSize.width <= 960 ? 84 : 340,
+    rightInset =
+      present !== null || collapsed || canvasSize.width <= 960 ? 16 : 304,
+    labelWidth = present !== null ? 132 : 108,
+    phaseTop = present !== null ? 16 : 108,
+    laneTop = phaseTop + 40,
+    columnLeft = leftX + labelWidth + 8;
+  useEffect(() => {
+    const element = editorRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setCanvasSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      }),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const presenting = present !== null;
+  useEffect(() => {
+    const element = guideRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setGuideHeight(
+        entry.borderBoxSize?.[0]?.blockSize || element.offsetHeight,
+      ),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [presenting]);
   const notify = useCallback((message: string) => {
     setToast(message);
     clearTimeout(toastTimer.current);
@@ -216,7 +259,9 @@ function EditorInner() {
   useEffect(() => {
     if (journeyId) {
       const v = useStore.getState().workspace.ui.viewport;
-      flow.setViewport(v || { x: 450, y: 140, zoom: 0.68 });
+      flow.setViewport(
+        v || { x: window.innerWidth <= 960 ? 208 : 464, y: 156, zoom: 0.68 },
+      );
     }
     setSearch("");
     setOwner("");
@@ -233,6 +278,7 @@ function EditorInner() {
     setDialog("import");
   };
   const loadExample = (kind: "investing" | "mortgage") => {
+    setView("canvas");
     const existing = s.workspace.journeys.find(
       (x) => x.id === (kind === "investing" ? "sme-investing" : "mortgage"),
     );
@@ -250,6 +296,7 @@ function EditorInner() {
   };
   const select = useCallback(
     (selection: Selection) => {
+      setView("canvas");
       useStore.getState().select(selection);
       const candidates = flow
         .getNodes()
@@ -281,6 +328,7 @@ function EditorInner() {
       void document.exitFullscreen().catch(() => {});
     if (originalPresent.current)
       flow.setViewport(originalPresent.current.viewport, duration);
+    if (originalPresent.current) setView(originalPresent.current.view);
   }, [flow]);
   useEffect(() => {
     if (present === null) return;
@@ -295,7 +343,9 @@ function EditorInner() {
     originalPresent.current = {
       layers: s.workspace.ui.layers,
       viewport: flow.getViewport(),
+      view,
     };
+    setView("canvas");
     setPresent(0);
     setDrawer(null);
     document.documentElement.requestFullscreen?.().catch(() => {});
@@ -308,18 +358,40 @@ function EditorInner() {
         (!slide?.focusLanes.length ||
           slide.focusLanes.includes(String(n.data.lane))),
     );
-    if (relevant.length)
-      requestAnimationFrame(
-        () =>
-          void flow.fitView({
-            nodes: relevant,
-            padding: 0.12,
-            maxZoom: 0.8,
-            minZoom: 0.15,
-            duration: 200,
-          }),
-      );
-  }, [present, graph, slide, flow]);
+    if (!relevant.length) return;
+    const fitted = getViewportForBounds(
+      getNodesBounds(
+        relevant.map((node) => ({
+          ...node,
+          width: Number(node.style?.width),
+          height: Number(node.style?.height),
+        })),
+      ),
+      Math.max(100, canvasSize.width - columnLeft - rightInset),
+      Math.max(100, canvasSize.height - laneTop - guideHeight - 32),
+      0.1,
+      0.8,
+      0.04,
+    );
+    const frame = requestAnimationFrame(
+      () =>
+        void flow.setViewport(
+          { ...fitted, x: fitted.x + columnLeft, y: fitted.y + laneTop },
+          { duration: 200 },
+        ),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [
+    present,
+    graph,
+    slide,
+    flow,
+    canvasSize,
+    columnLeft,
+    rightInset,
+    laneTop,
+    guideHeight,
+  ]);
   const defaultCell = () => {
     const sel = s.selection;
     return {
@@ -460,21 +532,34 @@ function EditorInner() {
     });
     setNodes(graph?.nodes || []);
   };
+  const exportCanvasImage = (type: "png" | "svg") => {
+    setView("canvas");
+    requestAnimationFrame(
+      () => void exportImage(type, 1).catch((error) => notify(error.message)),
+    );
+  };
   const actions: Action[] = [
     { id: "new", label: t("newJourney"), run: () => setDialog("new") },
     { id: "duplicate-journey", label: t("duplicate"), run: s.duplicateJourney },
     { id: "import", label: t("import"), run: () => setDialog("import") },
-    { id: "export", label: t("export"), run: () => setDialog("export") },
+    {
+      id: "export",
+      label: t("export"),
+      run: () => {
+        setView("canvas");
+        setDialog("export");
+      },
+    },
     { id: "backup", label: t("backup"), run: () => exportJSON(true) },
     {
       id: "png",
       label: "Export PNG",
-      run: () => void exportImage("png", 1).catch((e) => notify(e.message)),
+      run: () => exportCanvasImage("png"),
     },
     {
       id: "svg",
       label: "Export SVG",
-      run: () => void exportImage("svg", 1).catch((e) => notify(e.message)),
+      run: () => exportCanvasImage("svg"),
     },
     {
       id: "csv-services",
@@ -599,13 +684,26 @@ function EditorInner() {
           delete ui.viewport;
         }),
     })),
-    ...(
-      ["services", "frictions", "capabilities", "steps", "overview"] as const
-    ).map((v) => ({
-      id: `view-${v}`,
-      label: `Open ${t(v)} view`,
-      run: () => setDrawer(v),
-    })),
+    ...(["services", "frictions", "capabilities", "steps"] as const).map(
+      (v) => ({
+        id: `view-${v}`,
+        label: `Open ${t(v)} view`,
+        run: () => {
+          setView("canvas");
+          setDrawer(v);
+        },
+      }),
+    ),
+    {
+      id: "view-overview",
+      label: `Open ${t("overview")} view`,
+      run: () => setView("overview"),
+    },
+    {
+      id: "view-canvas",
+      label: `Open ${t("canvas")} view`,
+      run: () => setView("canvas"),
+    },
     ...(j?.lanes.flatMap((l) => [
       {
         id: `lane-${l.id}`,
@@ -702,6 +800,7 @@ function EditorInner() {
       const mod = e.metaKey || e.ctrlKey,
         k = e.key.toLowerCase();
       if (mod) {
+        if (view === "overview" && !["z", "k", "\\"].includes(k)) return;
         if (k === "z") {
           e.preventDefault();
           if (e.shiftKey) useStore.temporal.getState().redo();
@@ -732,6 +831,10 @@ function EditorInner() {
       if (k === "m" && e.shiftKey) {
         e.preventDefault();
         s.setMode(s.workspace.ui.mode === "now" ? "target" : "now");
+        return;
+      }
+      if (view === "overview") {
+        if (e.key === "?") setDialog("help");
         return;
       }
       if (e.key === " ") {
@@ -766,7 +869,6 @@ function EditorInner() {
       window.removeEventListener("keyup", up);
     };
   });
-  const leftX = collapsed ? 16 : 340;
   const backupAge =
     Date.now() -
     new Date(
@@ -774,7 +876,9 @@ function EditorInner() {
     ).getTime();
   return (
     <main
+      ref={editorRef}
       className="lb-editor"
+      data-view={view}
       aria-label="Laneboard editor"
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) e.preventDefault();
@@ -800,7 +904,14 @@ function EditorInner() {
         edgeTypes={edgeTypes}
         onNodesChange={onChanges}
         onNodeDragStop={onDragStop}
-        nodesDraggable={!!j && !j.readOnly && tool !== "hand" && !space}
+        nodesDraggable={
+          present === null &&
+          view === "canvas" &&
+          !!j &&
+          !j.readOnly &&
+          tool !== "hand" &&
+          !space
+        }
         nodesConnectable={false}
         panOnDrag={tool === "hand" || space ? true : [1, 2]}
         panOnScroll
@@ -814,7 +925,7 @@ function EditorInner() {
         minZoom={0.1}
         maxZoom={2}
         defaultViewport={
-          s.workspace.ui.viewport || { x: 450, y: 140, zoom: 0.68 }
+          s.workspace.ui.viewport || { x: leftX + 124, y: 156, zoom: 0.68 }
         }
         onMoveEnd={(_, v) => {
           if (present === null)
@@ -875,18 +986,18 @@ function EditorInner() {
         proOptions={{ hideAttribution: false }}
       >
         <Background gap={20} size={1} />
-        {j && graph ? (
+        {j && graph && view === "canvas" ? (
           <>
             <div
               className="lb-phase-overlay"
-              style={{ left: leftX, right: collapsed ? 16 : 304 }}
+              style={{ left: columnLeft, right: rightInset, top: phaseTop }}
             >
               {graph.columns.map((p, i) => (
                 <div
                   key={p.id}
                   className="lb-phase lb-sticky-phase"
                   style={{
-                    left: viewport.x - leftX + p.x * viewport.zoom,
+                    left: viewport.x - columnLeft + p.x * viewport.zoom,
                     width: p.width * viewport.zoom,
                   }}
                 >
@@ -955,9 +1066,10 @@ function EditorInner() {
               className="lb-lane-overlay"
               style={{
                 left: leftX,
-                width: 108,
-                top: 112,
-                bottom: collapsed ? 16 : 64,
+                width: labelWidth,
+                top: laneTop,
+                bottom:
+                  present !== null ? guideHeight + 24 : collapsed ? 16 : 64,
               }}
             >
               {graph.rows.map((row) => (
@@ -965,7 +1077,7 @@ function EditorInner() {
                   key={row.id}
                   className={`lb-sticky-row lb-sticky-row--${row.kind}`}
                   style={{
-                    top: viewport.y - 112 + row.y * viewport.zoom,
+                    top: viewport.y - laneTop + row.y * viewport.zoom,
                     height: row.height * viewport.zoom,
                   }}
                 >
@@ -1012,10 +1124,32 @@ function EditorInner() {
               <Layers size={18} />
             )}
           </div>
-          <span className="lb-filepill__name">Laneboard</span>
-          <span className="lb-filepill-workspace">
-            {s.workspace.settings.name}
-          </span>
+          {j ? (
+            <button
+              className="lb-filepill__journey"
+              aria-label={t("editJourney")}
+              title={j.title}
+              onClick={() => {
+                setView("canvas");
+                s.select({ kind: "journey", id: j.id });
+              }}
+            >
+              <span className="lb-filepill__context">
+                Laneboard{" "}
+                <span>
+                  · {j.segment} · {t(s.workspace.ui.mode)}
+                </span>
+              </span>
+              <span className="lb-filepill__title">{j.title}</span>
+            </button>
+          ) : (
+            <>
+              <span className="lb-filepill__name">Laneboard</span>
+              <span className="lb-filepill-workspace">
+                {s.workspace.settings.name}
+              </span>
+            </>
+          )}
           <span className="lb-saved" data-state={s.saveState} role="status">
             {t(
               s.saveState === "saved"
@@ -1037,7 +1171,13 @@ function EditorInner() {
                 {[
                   { label: t("newJourney"), run: () => setDialog("new") },
                   { label: t("import"), run: () => setDialog("import") },
-                  { label: t("export"), run: () => setDialog("export") },
+                  {
+                    label: t("export"),
+                    run: () => {
+                      setView("canvas");
+                      setDialog("export");
+                    },
+                  },
                   { label: t("backup"), run: () => exportJSON(true) },
                   { label: t("settings"), run: () => setDialog("settings") },
                   { label: t("toggleUI"), run: () => setCollapsed((v) => !v) },
@@ -1054,6 +1194,25 @@ function EditorInner() {
             </Menu.Portal>
           </Menu.Root>
         </Panel>
+        {j && present === null ? (
+          <Panel
+            position="top-left"
+            className="lb-island lb-view-switch"
+            style={{ left: view === "overview" ? 16 : leftX }}
+          >
+            <div className="lb-segmented" aria-label={t("journeyViews")}>
+              {(["canvas", "overview"] as const).map((name) => (
+                <button
+                  key={name}
+                  aria-pressed={view === name}
+                  onClick={() => setView(name)}
+                >
+                  {t(name)}
+                </button>
+              ))}
+            </div>
+          </Panel>
+        ) : null}
         <Panel position="top-right" className="lb-island lb-cluster">
           <div className="lb-segmented" aria-label="Journey mode">
             {(["now", "target"] as const).map((mode) => (
@@ -1076,13 +1235,16 @@ function EditorInner() {
           </button>
           <button
             className="lb-btn lb-btn--primary"
-            onClick={() => setDialog("export")}
+            onClick={() => {
+              setView("canvas");
+              setDialog("export");
+            }}
           >
             <Download size={14} />
             {t("export")}
           </button>
         </Panel>
-        {present === null && !collapsed ? (
+        {present === null && !collapsed && view === "canvas" ? (
           <>
             <nav
               className="lb-island lb-rail lb-rail-position"
@@ -1106,12 +1268,6 @@ function EditorInner() {
                   key: "definitions",
                   icon: SlidersHorizontal,
                   run: () => setDialog("definitions"),
-                },
-                {
-                  id: "overview",
-                  key: "overview",
-                  icon: Network,
-                  run: () => setDrawer("overview"),
                 },
                 {
                   id: "ai",
@@ -1537,25 +1693,7 @@ function EditorInner() {
             ) : null}
           </>
         ) : null}
-        {j && present === null && !collapsed ? (
-          <Panel position="top-center" className="lb-island lb-map-title">
-            <div>
-              <span className="lb-caps">
-                {j.segment} ·{" "}
-                {s.workspace.ui.mode === "now" ? t("now") : t("target")}
-              </span>
-              <h2>{j.title}</h2>
-            </div>
-            <button
-              className="lb-iconbtn"
-              aria-label={t("editJourney")}
-              onClick={() => s.select({ kind: "journey", id: j.id })}
-            >
-              <MoreHorizontal />
-            </button>
-          </Panel>
-        ) : null}
-        {j && present === null && !collapsed ? (
+        {j && present === null && !collapsed && view === "canvas" ? (
           <div className="lb-island lb-searchbar lb-canvas-ui">
             <Search size={14} />
             <input
@@ -1631,7 +1769,7 @@ function EditorInner() {
             </Menu.Root>
           </div>
         ) : null}
-        {j && present === null && !collapsed ? (
+        {j && present === null && !collapsed && view === "canvas" ? (
           <>
             <Panel position="bottom-center" className="lb-island lb-dock">
               {(editorMode === "map" ? toolSpec : sketchSpec).map((a) => (
@@ -1744,7 +1882,11 @@ function EditorInner() {
           </>
         ) : null}
         {present !== null && slide ? (
-          <Panel position="bottom-center" className="lb-island lb-guide">
+          <Panel
+            position="bottom-center"
+            className="lb-island lb-guide"
+            ref={guideRef}
+          >
             <span className="lb-guide__step">
               {present + 1} / {sequence.length}
             </span>
@@ -1778,6 +1920,9 @@ function EditorInner() {
           </Panel>
         ) : null}
       </ReactFlow>
+      {j && view === "overview" && present === null ? (
+        <Overview onSelect={select} />
+      ) : null}
       {!j ? (
         <div className="lb-welcome">
           <div className="lb-welcome__center">
@@ -1842,7 +1987,7 @@ function EditorInner() {
           </span>
         </div>
       ) : null}
-      {j && drawer && present === null && !collapsed ? (
+      {j && drawer && present === null && !collapsed && view === "canvas" ? (
         <Drawer
           tab={drawer}
           setTab={setDrawer}
