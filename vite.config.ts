@@ -28,6 +28,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The app registers its worker directly; activate updated assets without closing every tab.
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2,json}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: "/index.html",
