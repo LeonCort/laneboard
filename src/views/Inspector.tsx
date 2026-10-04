@@ -20,6 +20,7 @@ import {
   removeStructure,
   reorder,
   reorderPhase,
+  setCardLink,
 } from "../store/actions";
 import { useT, type Key } from "../i18n";
 import { Field, Select, Check } from "../ui/fields";
@@ -489,18 +490,11 @@ export function Inspector({
                           checked={service.linksTo.includes(other.id)}
                           disabled={disabled}
                           onChange={(v) =>
-                            edit((j) => {
-                              const x = j.services.find(
-                                (x) => x.id === sel.id,
-                              )!;
-                              x.linksTo = v
-                                ? [...x.linksTo, other.id]
-                                : x.linksTo.filter((id) => id !== other.id);
-                              if (v) {
-                                x.isolated = false;
-                                x.flowAssessment = "connected";
-                              }
-                            })
+                            setCardLink(
+                              { kind: "service", id: sel.id, lane: sel.lane },
+                              { kind: "service", id: other.id },
+                              v,
+                            )
                           }
                         />
                       ))}
@@ -704,9 +698,10 @@ export function Inspector({
                       label={t("informsStep")}
                       value={feed.to}
                       onChange={(v) =>
-                        edit((j) => {
-                          j.feeds.find((x) => x.id === sel.id)!.to = v;
-                        })
+                        setCardLink(
+                          { kind: "feed", id: sel.id, lane: sel.lane },
+                          { kind: "step", id: v },
+                        )
                       }
                       disabled={disabled}
                     >

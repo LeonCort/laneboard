@@ -7,6 +7,7 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   useViewport,
+  useConnection,
   type NodeProps,
   type EdgeProps,
   type Node,
@@ -16,6 +17,13 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Plus } from "lucide-react";
 import { useStore, currentJourney, addCard, type Selection } from "../store";
 import { targetState } from "../model/analysis";
+import {
+  cardSource,
+  cardTarget,
+  canConnectCards,
+  hasCardLink,
+} from "../model/connections";
+import { CardLinks } from "./CardLinks";
 import { useT } from "../i18n";
 import type { CardData, CellData } from "./layout";
 import type { Key } from "../i18n";
@@ -120,12 +128,31 @@ export const CellNode = memo(function CellNode({
 export const CardNode = memo(function CardNode({
   data,
   selected,
+  isConnectable,
 }: NodeProps<Node<CardData>>) {
   const t = useT(),
     owners = useStore((s) => s.workspace.owners),
     edit = useStore((s) => s.editJourney),
     [editing, setEditing] = useState(false),
     [text, setText] = useState(data.text);
+  const journey = useStore(currentJourney),
+    mode = useStore((s) => s.workspace.ui.mode);
+  const source = cardSource(data),
+    target = cardTarget(data);
+  const canReceive = useConnection((connection) => {
+    const from =
+      connection.fromNode?.type === "card"
+        ? cardSource(connection.fromNode.data as CardData)
+        : null;
+    return !!(
+      isConnectable &&
+      journey &&
+      from &&
+      target &&
+      canConnectCards(journey, from, target, mode) &&
+      !hasCardLink(journey, from, target)
+    );
+  });
   const commit = () => {
     edit((j) => {
       if (data.kind === "service") {
@@ -169,6 +196,7 @@ export const CardNode = memo(function CardNode({
       data-kind={data.feedKind}
       data-dimmed={data.dimmed}
       data-selected={selected}
+      data-link-target={canReceive}
       data-owned={data.showOwner}
       data-owner-index={owners.findIndex((o) => o.id === data.owner) + 1}
     >
@@ -176,7 +204,10 @@ export const CardNode = memo(function CardNode({
         type="target"
         position={Position.Left}
         id="in"
-        className="lb-handle"
+        className="lb-handle lb-link-target"
+        isConnectable={isConnectable}
+        isConnectableStart={false}
+        isConnectableEnd={canReceive}
       />
       {data.kind === "step" ? (
         <span className="lb-card__num">{data.number}</span>
@@ -239,12 +270,22 @@ export const CardNode = memo(function CardNode({
           <span className="lb-tag lb-tag--assumption">{t("assumption")}</span>
         ) : null}
       </div>
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="out"
-        className="lb-handle"
-      />
+      {source ? (
+        <CardLinks
+          source={source}
+          name={data.text}
+          connectable={isConnectable}
+          readOnly={data.readOnly}
+        />
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="out"
+          className="lb-handle"
+          isConnectable={false}
+        />
+      )}
     </div>
   );
 });
@@ -262,6 +303,8 @@ export const JourneyEdge = memo(function JourneyEdge(props: EdgeProps) {
         id={props.id}
         path={path}
         className={`lb-edge lb-edge--${transition}${props.data?.dimmed ? " is-dimmed" : ""}`}
+        markerEnd={props.markerEnd}
+        interactionWidth={0}
       />
       {transition === "restart" ? (
         <EdgeLabelRenderer>

@@ -1,0 +1,84 @@
+{
+  "format": "laneboard",
+  "schemaVersion": 1,
+  "journeys": [
+    {
+      "id": "connection-demo",
+      "title": "Plan a savings buffer",
+      "phases": [
+        { "id": "discover", "name": "Explore", "width": 300 },
+        { "id": "apply", "name": "Apply", "width": 300 }
+      ],
+      "lanes": [
+        {
+          "id": "customer",
+          "group": null,
+          "name": "Customer",
+          "kind": "customer"
+        },
+        {
+          "id": "app",
+          "group": null,
+          "name": "Mobile app",
+          "kind": "channel",
+          "channel": { "type": "digital" }
+        }
+      ],
+      "services": [
+        {
+          "id": "options",
+          "name": "Savings options",
+          "phase": "discover",
+          "linksTo": [],
+          "status": {
+            "now": { "app": "native" },
+            "target": { "app": "native" }
+          }
+        },
+        {
+          "id": "account",
+          "name": "Open savings account",
+          "phase": "apply",
+          "linksTo": [],
+          "status": {
+            "now": { "app": "webview" },
+            "target": { "app": "native" }
+          }
+        }
+      ],
+      "steps": [
+        {
+          "id": "compare",
+          "lane": "app",
+          "phase": "discover",
+          "text": "Compare savings options"
+        },
+        {
+          "id": "open",
+          "lane": "app",
+          "phase": "apply",
+          "text": "Open an account"
+        }
+      ],
+      "feeds": [
+        {
+          "id": "signal",
+          "kind": "entry",
+          "lane": "customer",
+          "phase": "discover",
+          "to": "compare",
+          "text": "Surplus cash signal"
+        }
+      ],
+      "notes": [
+        {
+          "id": "research",
+          "lane": "customer",
+          "phase": "apply",
+          "text": "Interview customers"
+        }
+      ],
+      "experience": { "now": [0, -1], "target": [1, 1] }
+    }
+  ]
+}

@@ -20,6 +20,9 @@ import {
   getNodesBounds,
   getViewportForBounds,
   applyNodeChanges,
+  ConnectionLineType,
+  type Connection,
+  type Edge,
   type Node,
   type NodeChange,
 } from "@xyflow/react";
@@ -83,7 +86,14 @@ import {
   duplicateCards,
   copyCards,
   pasteCards,
+  setCardLink,
 } from "./store/actions";
+import {
+  cardSource,
+  cardTarget,
+  canConnectCards,
+  hasCardLink,
+} from "./model/connections";
 import { useT, type Key } from "./i18n";
 import { exampleFile } from "./examples";
 import { layout, type CardData, type CellData } from "./canvas/layout";
@@ -294,6 +304,24 @@ function EditorInner() {
   useEffect(() => {
     setNodes(graph?.nodes || []);
   }, [graph]);
+  const validConnection = useCallback(
+    (connection: Connection | Edge) => {
+      const from = flow.getNode(connection.source),
+        to = flow.getNode(connection.target);
+      const source =
+        from?.type === "card" ? cardSource(from.data as CardData) : null;
+      const target =
+        to?.type === "card" ? cardTarget(to.data as CardData) : null;
+      return !!(
+        j &&
+        source &&
+        target &&
+        canConnectCards(j, source, target, s.workspace.ui.mode) &&
+        !hasCardLink(j, source, target)
+      );
+    },
+    [flow, j, s.workspace.ui.mode],
+  );
   useEffect(() => {
     document.documentElement.dataset.sidebar = leftCollapsed
       ? "collapsed"
@@ -1036,7 +1064,24 @@ function EditorInner() {
           tool !== "hand" &&
           !space
         }
-        nodesConnectable={false}
+        nodesConnectable={
+          present === null && view === "canvas" && !!j && !j.readOnly && !space
+        }
+        connectOnClick={false}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{ stroke: "var(--accent)", strokeWidth: 2 }}
+        connectionRadius={24}
+        isValidConnection={validConnection}
+        onConnect={(connection) => {
+          const source = cardSource(
+            flow.getNode(connection.source)?.data as CardData | undefined,
+          );
+          const target = cardTarget(
+            flow.getNode(connection.target)?.data as CardData | undefined,
+          );
+          if (source && target && setCardLink(source, target))
+            notify(t(source.kind === "feed" ? "linkUpdated" : "linkAdded"));
+        }}
         panOnDrag={tool === "hand" || space ? true : [1, 2]}
         panOnScroll
         zoomOnScroll={false}

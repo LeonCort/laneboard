@@ -1,5 +1,11 @@
 import { currentJourney, useStore, type Selection } from ".";
 import {
+  canConnectCards,
+  hasCardLink,
+  type LinkSource,
+  type LinkTarget,
+} from "../model/connections";
+import {
   newId,
   phaseSchema,
   laneSchema,
@@ -7,6 +13,36 @@ import {
   type Journey,
   type Lane,
 } from "../model/schema";
+
+export function setCardLink(
+  source: LinkSource,
+  target: LinkTarget,
+  linked = true,
+) {
+  const store = useStore.getState(),
+    journey = currentJourney(store);
+  if (
+    !journey ||
+    !canConnectCards(journey, source, target, store.workspace.ui.mode)
+  )
+    return false;
+  if (source.kind === "feed" && !linked) return false;
+  if (hasCardLink(journey, source, target) === linked) return false;
+  store.editJourney((j) => {
+    if (source.kind === "service") {
+      const service = j.services.find((s) => s.id === source.id)!;
+      service.linksTo = linked
+        ? [...service.linksTo, target.id]
+        : service.linksTo.filter((id) => id !== target.id);
+      if (linked) {
+        service.isolated = false;
+        service.flowAssessment = "connected";
+      }
+    } else j.feeds.find((feed) => feed.id === source.id)!.to = target.id;
+  });
+  return true;
+}
+
 export function addLane() {
   const j = currentJourney(useStore.getState());
   createLane({

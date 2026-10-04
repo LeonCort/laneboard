@@ -4,7 +4,7 @@ import {
   flowAssessment,
   targetState,
 } from "../model/analysis";
-import type { Node, Edge } from "@xyflow/react";
+import { MarkerType, type Node, type Edge } from "@xyflow/react";
 import type { Journey, Mode, Layer, UIState } from "../model/schema";
 import { visibleSteps, evaluateService } from "../rules";
 import type { Selection } from "../store";
@@ -301,7 +301,7 @@ export function layout(
             type: "card",
             parentId: cellId,
             position: { x: 8, y: cy },
-            data: { ...c, cellId },
+            data: { ...c, cellId, readOnly: c.readOnly || l.locked },
             style: { width: p.width - 16, height },
             selected: selection?.id === c.entityId && selection.kind === c.kind,
             draggable: !j.readOnly && !l.locked,
@@ -372,6 +372,55 @@ export function layout(
       });
     });
   }
+  if (active.has("services")) {
+    const rendered = nodes.filter(
+      (node) => node.type === "card" && node.data.kind === "service",
+    );
+    const links = new Map(
+        j.services.map((service) => [service.id, service.linksTo]),
+      ),
+      rowY = new Map(rows.map((row) => [row.id, row.y]));
+    const byService = new Map<string, Node[]>();
+    for (const node of rendered) {
+      const id = String(node.data.entityId);
+      byService.set(id, [...(byService.get(id) || []), node]);
+    }
+    for (const from of rendered) {
+      const source = from.data as CardData;
+      for (const id of new Set(links.get(source.entityId) || [])) {
+        if (id === source.entityId) continue;
+        const candidates = byService.get(id) || [],
+          fromY = rowY.get(source.lane) || 0;
+        const target =
+          candidates.find((node) => node.data.lane === source.lane) ||
+          candidates.reduce<Node | undefined>((nearest, node) => {
+            const distance = Math.abs(
+              (rowY.get(String(node.data.lane)) || 0) - fromY,
+            );
+            return !nearest ||
+              distance <
+                Math.abs((rowY.get(String(nearest.data.lane)) || 0) - fromY)
+              ? node
+              : nearest;
+          }, undefined);
+        if (target)
+          edges.push({
+            id: `service-link-${from.id}-${target.id}`,
+            source: from.id,
+            target: target.id,
+            sourceHandle: "out",
+            targetHandle: "in",
+            type: "journey",
+            data: {
+              transition: "service",
+              dimmed: source.dimmed || target.data.dimmed,
+            },
+            markerEnd: { type: MarkerType.ArrowClosed, color: "var(--accent)" },
+            zIndex: 4,
+          });
+      }
+    }
+  }
   if (active.has("feeds") && active.has("journey"))
     for (const f of j.feeds) {
       const to = steps.find((s) => s.id === f.to);
@@ -429,7 +478,11 @@ export function layout(
       width: Number(node.style?.width),
       height: Number(node.style?.height),
     })),
-    edges,
+    edges: edges.map((edge) => ({
+      ...edge,
+      selectable: false,
+      focusable: false,
+    })),
     rows,
     columns,
     width: totalWidth,
