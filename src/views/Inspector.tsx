@@ -884,7 +884,10 @@ export function Inspector({
                                   const c = j.lanes.find(
                                     (x) => x.id === sel.id,
                                   )!.channel;
-                                  if (c?.type === "digital") c.webviewHost = v;
+                                  if (c?.type === "digital") {
+                                    c.platform ??= channelPlatform(l);
+                                    c.webviewHost = v;
+                                  }
                                 })
                               }
                             />

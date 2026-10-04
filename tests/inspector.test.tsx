@@ -29,3 +29,15 @@ it("adding a link disables and clears the flow connection", () => {
   expect(screen.getByLabelText("Flow connection")).toBeDisabled();
   expect(screen.getByLabelText("Flow connection")).toHaveValue("connected");
 });
+
+it("keeps a legacy app channel classified as an app when embedded web support is disabled", () => {
+  useStore.getState().select({ kind: "lane", id: "app" });
+  render(<Inspector confirm={() => {}} />);
+  expect(screen.getByLabelText("Channel platform")).toHaveValue("app");
+  fireEvent.click(screen.getByLabelText("Webview host"));
+  expect(screen.getByLabelText("Channel platform")).toHaveValue("app");
+  expect(
+    useStore.getState().workspace.journeys[0].lanes.find((l) => l.id === "app")
+      ?.channel,
+  ).toMatchObject({ platform: "app", webviewHost: false });
+});
