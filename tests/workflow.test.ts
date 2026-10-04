@@ -163,3 +163,16 @@ it("migrates existing saved workspaces without replacing their Target design", (
   );
   expect(migrated.ui.mode).toBe("now");
 });
+
+it("preserves a service when its initial channel becomes assisted", () => {
+  addCard("service", "app", "discover");
+  useStore.getState().editJourney((j) => {
+    j.lanes.find((l) => l.id === "app")!.channel = { type: "assisted" };
+    delete j.services[0].status.now.app;
+    delete j.services[0].status.target.app;
+  });
+  expect(journey().services[0].placementLane).toBe("web");
+  expect(
+    parseImport(JSON.stringify(useStore.getState().workspace)).warnings,
+  ).toEqual([]);
+});

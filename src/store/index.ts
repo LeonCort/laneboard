@@ -78,7 +78,22 @@ export const useStore = create<State>()(
         if (!j || j.readOnly) return;
         get().edit((w) => {
           const j = w.journeys.find((j) => j.id === w.ui.selectedJourney);
-          if (j) fn(j);
+          if (j) {
+            fn(j);
+            for (const service of j.services) {
+              if (
+                service.placementLane &&
+                !j.lanes.some(
+                  (l) =>
+                    l.id === service.placementLane &&
+                    l.channel?.type === "digital",
+                )
+              )
+                service.placementLane = j.lanes.find(
+                  (l) => l.channel?.type === "digital",
+                )?.id;
+            }
+          }
         });
       },
       select: (selection) =>
