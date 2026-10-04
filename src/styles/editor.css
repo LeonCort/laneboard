@@ -354,6 +354,30 @@
 .lb-link-blocked .lb-btn {
   width: 100%;
 }
+.lb-context-menu {
+  min-width: 220px;
+  max-height: var(--radix-popper-available-height);
+  overflow: auto;
+}
+.lb-context-menu__title {
+  max-width: 280px;
+  padding: var(--space-2);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+.lb-context-menu__hint {
+  max-width: 280px;
+  padding: 0 var(--space-2) var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.lb-context-menu [data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.lb-context-menu [data-destructive] {
+  color: var(--crit);
+}
 [data-dimmed="true"] {
   opacity: 0.25;
 }

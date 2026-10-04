@@ -278,14 +278,21 @@ export function AddLaneButton({
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
         className={`${compact ? "lb-inline-add" : "lb-iconbtn"} nodrag nopan`}
+        data-add-lane
         aria-label={label}
         title={label}
         disabled={journey.lanes.length >= 100}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (e.button === 0 && !e.ctrlKey) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
         onDoubleClick={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
-          if (e.detail > 1) e.preventDefault();
+          if (e.detail > 0) e.preventDefault();
         }}
       >
         <Plus size={14} />

@@ -87,6 +87,7 @@ import {
   copyCards,
   pasteCards,
   setCardLink,
+  setLaneHidden,
 } from "./store/actions";
 import {
   cardSource,
@@ -98,6 +99,11 @@ import { useT, type Key } from "./i18n";
 import { exampleFile } from "./examples";
 import { layout, type CardData, type CellData } from "./canvas/layout";
 import { nodeTypes, edgeTypes } from "./canvas/nodes";
+import {
+  CanvasContextMenu,
+  type ContextCommand,
+  type ContextTarget,
+} from "./canvas/ContextMenu";
 import {
   AddLaneButton,
   HiddenLanesControl,
@@ -186,6 +192,7 @@ function EditorInner() {
     } | null>(null),
     [space, setSpace] = useState(false);
   const [sheet, setSheet] = useState<"tools" | "details" | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextTarget | null>(null);
   const seenJourneys = useRef(new Set(s.workspace.journeys.map((j) => j.id)));
   const narrow = canvasSize.width <= 960;
   const newJourneyPending =
@@ -907,6 +914,292 @@ function EditorInner() {
         ?.focus({ preventScroll: true }),
     );
   }
+  function contextAt(element: Element) {
+    if (
+      element.closest(
+        'input, textarea, select, [contenteditable], a, [role="menu"], [role="dialog"]',
+      )
+    )
+      return null;
+    const structure = element.closest<HTMLElement>(
+      "[data-context-lane], [data-context-phase], [data-context-group]",
+    );
+    if (structure) {
+      const kind = structure.dataset.contextLane
+        ? "lane"
+        : structure.dataset.contextPhase
+          ? "phase"
+          : "group";
+      return {
+        selection: {
+          kind,
+          id:
+            structure.dataset.contextLane ||
+            structure.dataset.contextPhase ||
+            structure.dataset.contextGroup!,
+        } as Selection,
+      };
+    }
+    const nodeId =
+        element.closest<HTMLElement>(".react-flow__node")?.dataset.id,
+      node = nodeId ? flow.getNode(nodeId) : undefined;
+    if (node?.type === "card") {
+      const data = node.data as CardData;
+      return {
+        nodeId,
+        selection: {
+          kind: data.kind,
+          id: data.entityId,
+          lane: data.lane,
+          phase: data.phase,
+        },
+      };
+    }
+    if (node?.type === "cell") {
+      const data = node.data as CellData;
+      return {
+        nodeId,
+        selection: {
+          kind: "cell",
+          id: node.id,
+          lane: data.lane,
+          phase: data.phase,
+        } as Selection,
+      };
+    }
+    if (node?.type === "sketch")
+      return {
+        nodeId,
+        selection: { kind: "sketch", id: String(node.data.id) } as Selection,
+      };
+    if (
+      element.closest(".react-flow__renderer") &&
+      !element.closest(
+        ".react-flow__panel, .lb-island, .lb-dock, .lb-canvas-ui",
+      )
+    )
+      return { selection: null };
+    return null;
+  }
+  function openContext(
+    element: Element,
+    x: number,
+    y: number,
+    keyboard = false,
+  ) {
+    if (!j || view !== "canvas" || present !== null || dialog) return false;
+    const target = contextAt(element);
+    if (!target) return false;
+    s.select(target.selection ? { ...target.selection, inline: true } : null);
+    setPicker(null);
+    setContextMenu({
+      ...target,
+      x,
+      y,
+      keyboard,
+      focus:
+        element.closest<HTMLElement>("button, [tabindex]") ||
+        editorRef.current!,
+    });
+    return true;
+  }
+  const contextSelection = contextMenu?.selection,
+    contextLane = j?.lanes.find(
+      (lane) =>
+        lane.id ===
+        (contextSelection?.kind === "lane"
+          ? contextSelection.id
+          : contextSelection?.lane),
+    ),
+    contextPhase = j?.phases.find(
+      (phase) =>
+        phase.id ===
+        (contextSelection?.kind === "phase"
+          ? contextSelection.id
+          : contextSelection?.phase),
+    ),
+    contextGroup = j?.laneGroups.find(
+      (group) => group.id === contextSelection?.id,
+    ),
+    contextNode = contextMenu?.nodeId
+      ? flow.getNode(contextMenu.nodeId)
+      : undefined,
+    contextTitle =
+      contextSelection?.kind === "cell"
+        ? `${contextLane?.name} · ${contextPhase?.name}`
+        : contextSelection?.kind === "lane"
+          ? contextLane?.name
+          : contextSelection?.kind === "phase"
+            ? contextPhase?.name
+            : contextSelection?.kind === "group"
+              ? contextGroup?.name
+              : (contextNode?.data.text as string | undefined) ||
+                (contextSelection?.kind === "sketch" ? t("sketch") : undefined);
+  const clickControl = (selector: string) =>
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLButtonElement>(selector)?.click(),
+    );
+  const contextCommands: ContextCommand[] = [];
+  if (contextMenu && j) {
+    const selection = contextMenu.selection,
+      blocked =
+        j.readOnly ||
+        contextLane?.locked ||
+        (s.workspace.ui.mode === "target" && targetState(j) === "not-started"),
+      card =
+        selection &&
+        ["service", "step", "friction", "feed", "note", "sketch"].includes(
+          selection.kind,
+        );
+    if (selection)
+      contextCommands.push({
+        label: t("editDetails"),
+        restoreFocus: false,
+        run: () => {
+          s.select({ ...selection, inline: false });
+          if (narrow) setSheet("details");
+        },
+      });
+    if (j.readOnly)
+      contextCommands.push({
+        label: t("duplicate"),
+        restoreFocus: false,
+        run: () => {
+          s.duplicateJourney();
+          if (selection) s.select({ ...selection, inline: true });
+        },
+      });
+    if (card && selection) {
+      if (selection.kind === "service" || selection.kind === "feed")
+        contextCommands.push({
+          label: t("connectCard"),
+          disabled: blocked,
+          restoreFocus: false,
+          run: () =>
+            clickControl(
+              `[data-id="${CSS.escape(contextMenu.nodeId!)}"] .lb-link-handle button`,
+            ),
+        });
+      contextCommands.push(
+        { label: t("copy"), run: copyCards },
+        { label: t("duplicateItem"), disabled: blocked, run: duplicateCards },
+        {
+          label: t("delete"),
+          disabled: blocked,
+          destructive: true,
+          separator: true,
+          run: deleteSelection,
+        },
+      );
+    } else if (selection?.kind === "cell") {
+      for (const kind of [
+        "step",
+        ...(contextLane?.channel?.type === "digital" ? ["service"] : []),
+        "friction",
+        "note",
+        ...(j.steps.length ? ["feed"] : []),
+      ] as Selection["kind"][])
+        contextCommands.push({
+          label: t(
+            {
+              step: "toolStep",
+              service: "toolService",
+              friction: "toolFriction",
+              note: "toolNote",
+              feed: "toolFeed",
+            }[kind as "step"],
+          ),
+          disabled: blocked,
+          restoreFocus: false,
+          run: () => addCard(kind, selection.lane!, selection.phase!),
+        });
+    } else if (selection?.kind === "lane" && contextLane) {
+      contextCommands.push(
+        {
+          label: t("editLane"),
+          restoreFocus: false,
+          run: () =>
+            clickControl(`[data-lane-label="${CSS.escape(selection.id)}"]`),
+        },
+        {
+          label: t(contextLane.locked ? "unlockLane" : "lockLane"),
+          disabled: j.readOnly,
+          run: () =>
+            s.editJourney((journey) => {
+              const lane = journey.lanes.find(
+                (lane) => lane.id === selection.id,
+              );
+              if (lane) lane.locked = !lane.locked;
+            }),
+        },
+        {
+          label: t("hideLane"),
+          disabled: j.readOnly,
+          run: () => setLaneHidden(selection.id, true),
+        },
+      );
+    } else if (selection?.kind === "group") {
+      contextCommands.push(
+        {
+          label: t(
+            s.workspace.ui.collapsedGroups.includes(selection.id)
+              ? "expandGroup"
+              : "collapseGroup",
+          ),
+          run: () => toggleGroup(selection.id),
+        },
+        {
+          label: t("addLane"),
+          disabled: j.readOnly || j.lanes.length >= 100,
+          restoreFocus: false,
+          run: () =>
+            clickControl(
+              `[data-context-group="${CSS.escape(selection.id)}"] .lb-inline-add`,
+            ),
+        },
+      );
+    } else if (!selection) {
+      contextCommands.push(
+        {
+          label: t("paste"),
+          disabled: j.readOnly,
+          run: () => void pasteCards().catch((e) => notify(e.message)),
+        },
+        {
+          label: t("addLane"),
+          disabled: j.readOnly || j.lanes.length >= 100,
+          restoreFocus: false,
+          run: () => clickControl(".lb-canvas-actions [data-add-lane]"),
+        },
+        {
+          label: t("addPhase"),
+          disabled: j.readOnly,
+          restoreFocus: false,
+          run: addPhase,
+        },
+        { label: t("fit"), separator: true, run: fit },
+        {
+          label: t("openPalette"),
+          restoreFocus: false,
+          run: () => setDialog("palette"),
+        },
+      );
+    }
+    const history = useStore.temporal.getState();
+    contextCommands.push(
+      {
+        label: t("undo"),
+        separator: true,
+        disabled: !history.pastStates.length,
+        run: () => history.undo(),
+      },
+      {
+        label: t("redo"),
+        disabled: !history.futureStates.length,
+        run: () => history.redo(),
+      },
+    );
+  }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -1028,10 +1321,40 @@ function EditorInner() {
   return (
     <main
       ref={editorRef}
+      tabIndex={-1}
       className="lb-editor"
       data-view={view}
       data-present={present !== null}
       aria-label="Laneboard editor"
+      onContextMenuCapture={(e) => {
+        if (e.shiftKey) {
+          setContextMenu(null);
+          return;
+        }
+        if (
+          e.target instanceof Element &&
+          openContext(e.target, e.clientX, e.clientY)
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      onKeyDownCapture={(e) => {
+        if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return;
+        if (!(e.target instanceof Element)) return;
+        const rect = e.target.getBoundingClientRect();
+        if (
+          openContext(
+            e.target,
+            rect.left + rect.width / 2,
+            rect.top + Math.min(rect.height / 2, 40),
+            true,
+          )
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) e.preventDefault();
       }}
@@ -1042,6 +1365,21 @@ function EditorInner() {
         }
       }}
     >
+      {contextMenu ? (
+        <CanvasContextMenu
+          target={contextMenu}
+          title={contextTitle || t("contextCanvas")}
+          hint={
+            j?.readOnly
+              ? t("readOnly")
+              : contextLane?.locked
+                ? t("lockedLaneHint")
+                : undefined
+          }
+          commands={contextCommands}
+          close={() => setContextMenu(null)}
+        />
+      ) : null}
       <input
         ref={fileRef}
         type="file"
@@ -1082,7 +1420,8 @@ function EditorInner() {
           if (source && target && setCardLink(source, target))
             notify(t(source.kind === "feed" ? "linkUpdated" : "linkAdded"));
         }}
-        panOnDrag={tool === "hand" || space ? true : [1, 2]}
+        panOnDrag={tool === "hand" || space ? [0, 1] : [1]}
+        onMoveStart={() => setContextMenu(null)}
         panOnScroll
         zoomOnScroll={false}
         zoomOnPinch
@@ -1170,6 +1509,7 @@ function EditorInner() {
                 <div
                   key={p.id}
                   className="lb-phase lb-sticky-phase"
+                  data-context-phase={p.id}
                   style={{
                     left: viewport.x - columnLeft + p.x * viewport.zoom,
                     width: p.width * viewport.zoom,
@@ -1211,6 +1551,7 @@ function EditorInner() {
                         });
                     }}
                     onPointerDown={(e) => {
+                      if (e.button !== 0 || e.ctrlKey) return;
                       e.preventDefault();
                       if (j.readOnly) return;
                       const start = e.clientX,
@@ -1249,13 +1590,17 @@ function EditorInner() {
                 <div
                   key={`${row.kind}-${row.id}`}
                   className={`lb-sticky-row lb-sticky-row--${row.kind}`}
+                  data-context-lane={row.kind === "lane" ? row.id : undefined}
                   style={{
                     top: viewport.y - laneTop + row.y * viewport.zoom,
                     height: row.height * viewport.zoom,
                   }}
                 >
                   {row.kind === "group" ? (
-                    <div className="lb-inline-group">
+                    <div
+                      className="lb-inline-group"
+                      data-context-group={row.id}
+                    >
                       <button
                         className="lb-sticky-group"
                         title={row.name}
