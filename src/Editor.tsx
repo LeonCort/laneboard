@@ -60,6 +60,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  X,
   Table2,
   GripVertical,
   ShieldCheck,
@@ -165,6 +166,7 @@ function EditorInner() {
       null,
     ),
     [search, setSearch] = useState(""),
+    [searchOpen, setSearchOpen] = useState(false),
     [owner, setOwner] = useState(""),
     [severity, setSeverity] = useState(""),
     [laneFilter, setLaneFilter] = useState(""),
@@ -220,13 +222,19 @@ function EditorInner() {
     } | null>(null),
     editorRef = useRef<HTMLElement>(null),
     guideRef = useRef<HTMLDivElement>(null),
-    fileRef = useRef<HTMLInputElement>(null);
+    fileRef = useRef<HTMLInputElement>(null),
+    searchRef = useRef<HTMLInputElement>(null),
+    searchTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeSearch = () => {
+    setSearchOpen(false);
+    searchTriggerRef.current?.focus();
+  };
   const leftX =
       present !== null ? 16 : collapsed || canvasSize.width <= 960 ? 84 : 340,
     rightInset =
       present !== null || collapsed || canvasSize.width <= 960 ? 16 : 304,
     labelWidth = 132,
-    phaseTop = present !== null ? 16 : 108,
+    phaseTop = present !== null ? 16 : canvasSize.width <= 520 ? 108 : 60,
     laneTop = phaseTop + 40,
     columnLeft = leftX + labelWidth + 8;
   useEffect(() => {
@@ -1259,162 +1267,290 @@ function EditorInner() {
             </div>
           </>
         ) : null}
-        <Panel position="top-left" className="lb-island lb-filepill">
-          <div className="lb-filepill__logo">
-            {s.workspace.settings.logo ? (
-              <img src={s.workspace.settings.logo} alt="Workspace logo" />
-            ) : (
-              <Layers size={18} />
-            )}
-          </div>
-          {j ? (
-            <button
-              className="lb-filepill__journey"
-              aria-label={t("editJourney")}
-              title={j.title}
-              onClick={() => {
-                setView("canvas");
-                s.select({ kind: "journey", id: j.id });
-                if (narrow || collapsed) setSheet("details");
-              }}
-            >
-              <span className="lb-filepill__context">
-                Laneboard{" "}
-                <span>
-                  · {j.segment} · {t(s.workspace.ui.mode)}
+        <Panel
+          position="top-left"
+          className="lb-topbar"
+          data-search-open={searchOpen && view === "canvas"}
+        >
+          <div className="lb-island lb-filepill">
+            <div className="lb-filepill__logo">
+              {s.workspace.settings.logo ? (
+                <img src={s.workspace.settings.logo} alt="Workspace logo" />
+              ) : (
+                <Layers size={18} />
+              )}
+            </div>
+            {j ? (
+              <button
+                className="lb-filepill__journey"
+                aria-label={t("editJourney")}
+                title={j.title}
+                onClick={() => {
+                  setView("canvas");
+                  s.select({ kind: "journey", id: j.id });
+                  if (narrow || collapsed) setSheet("details");
+                }}
+              >
+                <span className="lb-filepill__context">
+                  Laneboard{" "}
+                  <span>
+                    · {j.segment} · {t(s.workspace.ui.mode)}
+                  </span>
                 </span>
-              </span>
-              <span className="lb-filepill__title">{j.title}</span>
-            </button>
-          ) : (
-            <>
-              <span className="lb-filepill__name">Laneboard</span>
-              <span className="lb-filepill-workspace">
-                {s.workspace.settings.name}
-              </span>
-            </>
-          )}
-          <span className="lb-saved" data-state={s.saveState} role="status">
-            {t(
-              s.saveState === "saved"
-                ? "saved"
-                : s.saveState === "saving"
-                  ? "saving"
-                  : "saveError",
+                <span className="lb-filepill__title">{j.title}</span>
+              </button>
+            ) : (
+              <>
+                <span className="lb-filepill__name">Laneboard</span>
+                <span className="lb-filepill-workspace">
+                  {s.workspace.settings.name}
+                </span>
+              </>
             )}
-          </span>
-          <Menu.Root>
-            <Menu.Trigger
-              className="lb-iconbtn"
-              aria-label={t("workspaceMenu")}
-            >
-              <ChevronDown />
-            </Menu.Trigger>
-            <Menu.Portal>
-              <Menu.Content className="lb-popover lb-menu" sideOffset={8}>
-                {[
-                  { label: t("newJourney"), run: () => setDialog("new") },
-                  { label: t("import"), run: () => setDialog("import") },
-                  {
-                    label: t("export"),
-                    run: () => {
-                      setView("canvas");
-                      setDialog("export");
+            <span className="lb-saved" data-state={s.saveState} role="status">
+              {t(
+                s.saveState === "saved"
+                  ? "saved"
+                  : s.saveState === "saving"
+                    ? "saving"
+                    : "saveError",
+              )}
+            </span>
+            <Menu.Root>
+              <Menu.Trigger
+                className="lb-iconbtn"
+                aria-label={t("workspaceMenu")}
+              >
+                <ChevronDown />
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Content className="lb-popover lb-menu" sideOffset={8}>
+                  {[
+                    { label: t("newJourney"), run: () => setDialog("new") },
+                    { label: t("import"), run: () => setDialog("import") },
+                    {
+                      label: t("export"),
+                      run: () => {
+                        setView("canvas");
+                        setDialog("export");
+                      },
                     },
-                  },
-                  { label: t("backup"), run: () => exportJSON(true) },
-                  { label: t("settings"), run: () => setDialog("settings") },
-                  {
-                    label: t(collapsed ? "expandUI" : "toggleUI"),
-                    run: () => setCollapsed((v) => !v),
-                  },
-                ].map((a) => (
-                  <Menu.Item
-                    key={t(a.label)}
-                    className="lb-menu__item"
-                    onSelect={a.run}
+                    { label: t("backup"), run: () => exportJSON(true) },
+                    { label: t("settings"), run: () => setDialog("settings") },
+                    {
+                      label: t(collapsed ? "expandUI" : "toggleUI"),
+                      run: () => setCollapsed((v) => !v),
+                    },
+                  ].map((a) => (
+                    <Menu.Item
+                      key={t(a.label)}
+                      className="lb-menu__item"
+                      onSelect={a.run}
+                    >
+                      {t(a.label)}
+                    </Menu.Item>
+                  ))}
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu.Root>
+          </div>
+          {j && present === null ? (
+            <div className="lb-island lb-view-switch">
+              <div
+                className="lb-segmented"
+                role="group"
+                aria-label={t("journeyViews")}
+              >
+                {(["canvas", "data", "overview"] as const).map((name) => (
+                  <button
+                    key={name}
+                    aria-pressed={view === name}
+                    onClick={() => setView(name)}
                   >
-                    {t(a.label)}
-                  </Menu.Item>
+                    {t(name)}
+                  </button>
                 ))}
-              </Menu.Content>
-            </Menu.Portal>
-          </Menu.Root>
-        </Panel>
-        {j && present === null ? (
-          <Panel
-            position="top-left"
-            className="lb-island lb-view-switch"
-            style={{ left: view !== "canvas" ? 16 : leftX }}
-          >
-            <div className="lb-segmented" aria-label={t("journeyViews")}>
-              {(["canvas", "data", "overview"] as const).map((name) => (
+              </div>
+            </div>
+          ) : null}
+          {j && present === null && view === "canvas" ? (
+            <div
+              className="lb-island lb-searchbar"
+              data-open={searchOpen}
+              data-active={!!(search || owner || severity || laneFilter)}
+            >
+              <button
+                ref={searchTriggerRef}
+                className="lb-iconbtn lb-search-trigger"
+                aria-label={t("search")}
+                title={t("search")}
+                aria-expanded={searchOpen}
+                aria-controls="journey-search"
+                onClick={() => {
+                  setSearchOpen(true);
+                  requestAnimationFrame(() => searchRef.current?.focus());
+                }}
+              >
+                <Search size={18} />
+              </button>
+              <div className="lb-search-content" hidden={!searchOpen}>
+                <input
+                  ref={searchRef}
+                  id="journey-search"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      closeSearch();
+                    }
+                  }}
+                  aria-label={t("search")}
+                  placeholder={t("search")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <Menu.Root>
+                  <Menu.Trigger className="lb-iconbtn" aria-label={t("filter")}>
+                    <SlidersHorizontal />
+                  </Menu.Trigger>
+                  <Menu.Portal>
+                    <Menu.Content className="lb-popover lb-filter-menu">
+                      <label>
+                        {t("owner")}
+                        <select
+                          className="lb-select"
+                          value={owner}
+                          onChange={(e) => setOwner(e.target.value)}
+                        >
+                          <option value="">{t("all")}</option>
+                          {s.workspace.owners.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        {t("frictions")}
+                        <select
+                          className="lb-select"
+                          value={severity}
+                          onChange={(e) => setSeverity(e.target.value)}
+                        >
+                          <option value="">{t("all")}</option>
+                          {["high", "medium", "none"].map((x) => (
+                            <option key={x} value={x}>
+                              {t(x as Key)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        {t("lane")}
+                        <select
+                          className="lb-select"
+                          value={laneFilter}
+                          onChange={(e) => setLaneFilter(e.target.value)}
+                        >
+                          <option value="">{t("all")}</option>
+                          {j.lanes.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        className="lb-btn"
+                        onClick={() => {
+                          setSearch("");
+                          setOwner("");
+                          setSeverity("");
+                          setLaneFilter("");
+                        }}
+                      >
+                        {t("clearFilters")}
+                      </button>
+                    </Menu.Content>
+                  </Menu.Portal>
+                </Menu.Root>
                 <button
-                  key={name}
-                  aria-pressed={view === name}
-                  onClick={() => setView(name)}
+                  className="lb-iconbtn"
+                  aria-label={t("closeSearch")}
+                  title={t("closeSearch")}
+                  onClick={closeSearch}
                 >
-                  {t(name)}
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="lb-island lb-cluster">
+            <div
+              className="lb-segmented"
+              role="group"
+              aria-label="Journey mode"
+            >
+              {(["now", "target"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  aria-pressed={s.workspace.ui.mode === mode}
+                  onClick={() => {
+                    s.setMode(mode);
+                    if (
+                      mode === "target" &&
+                      j &&
+                      targetState(j) === "not-started"
+                    )
+                      setDialog("target");
+                  }}
+                >
+                  {t(mode)}
                 </button>
               ))}
             </div>
-            {view === "canvas" ? (
-              <>
-                <AddLaneButton key={j.id} journey={j} reveal={revealLane} />
-                <HiddenLanesControl journey={j} reveal={revealLane} />
-                <button
-                  className="lb-iconbtn"
-                  aria-label={t("editDetails")}
-                  onClick={() => {
-                    if (!s.selection) s.select({ kind: "journey", id: j.id });
-                    if (narrow || collapsed) setSheet("details");
-                  }}
-                >
-                  {<SlidersHorizontal size={16} />}
-                </button>
-              </>
-            ) : null}
+            <button
+              className="lb-btn lb-btn--ghost lb-btn--icon"
+              aria-label={t("present")}
+              title={t("present")}
+              disabled={!j}
+              onClick={startPresent}
+            >
+              <Play size={18} aria-hidden="true" />
+            </button>
+            <button
+              className="lb-btn lb-btn--primary lb-btn--icon"
+              aria-label={t("export")}
+              title={t("export")}
+              onClick={() => {
+                setView("canvas");
+                setDialog("export");
+              }}
+            >
+              <Download size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </Panel>
+        {j && present === null && view === "canvas" ? (
+          <Panel
+            position="top-left"
+            className="lb-island lb-canvas-actions"
+            style={{ left: leftX, top: phaseTop }}
+          >
+            <AddLaneButton key={j.id} journey={j} reveal={revealLane} />
+            <HiddenLanesControl journey={j} reveal={revealLane} />
+            <button
+              className="lb-iconbtn"
+              aria-label={t("editDetails")}
+              onClick={() => {
+                if (!s.selection) s.select({ kind: "journey", id: j.id });
+                if (narrow || collapsed) setSheet("details");
+              }}
+            >
+              {<SlidersHorizontal size={16} />}
+            </button>
           </Panel>
         ) : null}
-        <Panel position="top-right" className="lb-island lb-cluster">
-          <div className="lb-segmented" aria-label="Journey mode">
-            {(["now", "target"] as const).map((mode) => (
-              <button
-                key={mode}
-                aria-pressed={s.workspace.ui.mode === mode}
-                onClick={() => {
-                  s.setMode(mode);
-                  if (
-                    mode === "target" &&
-                    j &&
-                    targetState(j) === "not-started"
-                  )
-                    setDialog("target");
-                }}
-              >
-                {t(mode)}
-              </button>
-            ))}
-          </div>
-          <button
-            className="lb-btn lb-btn--ghost"
-            disabled={!j}
-            onClick={startPresent}
-          >
-            <Play size={14} />
-            {t("present")}
-          </button>
-          <button
-            className="lb-btn lb-btn--primary"
-            onClick={() => {
-              setView("canvas");
-              setDialog("export");
-            }}
-          >
-            <Download size={14} />
-            {t("export")}
-          </button>
-        </Panel>
         {present === null && view === "canvas" ? (
           <>
             <nav
@@ -1905,82 +2041,6 @@ function EditorInner() {
               </ResponsivePanel>
             ) : null}
           </>
-        ) : null}
-        {j && present === null && !collapsed && view === "canvas" ? (
-          <div className="lb-island lb-searchbar lb-canvas-ui">
-            <Search size={14} />
-            <input
-              aria-label={t("search")}
-              placeholder={t("search")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <Menu.Root>
-              <Menu.Trigger className="lb-iconbtn" aria-label={t("filter")}>
-                <SlidersHorizontal />
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Content className="lb-popover lb-filter-menu">
-                  <label>
-                    {t("owner")}
-                    <select
-                      className="lb-select"
-                      value={owner}
-                      onChange={(e) => setOwner(e.target.value)}
-                    >
-                      <option value="">{t("all")}</option>
-                      {s.workspace.owners.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {t("frictions")}
-                    <select
-                      className="lb-select"
-                      value={severity}
-                      onChange={(e) => setSeverity(e.target.value)}
-                    >
-                      <option value="">{t("all")}</option>
-                      {["high", "medium", "none"].map((x) => (
-                        <option key={x} value={x}>
-                          {t(x as Key)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {t("lane")}
-                    <select
-                      className="lb-select"
-                      value={laneFilter}
-                      onChange={(e) => setLaneFilter(e.target.value)}
-                    >
-                      <option value="">{t("all")}</option>
-                      {j.lanes.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    className="lb-btn"
-                    onClick={() => {
-                      setSearch("");
-                      setOwner("");
-                      setSeverity("");
-                      setLaneFilter("");
-                    }}
-                  >
-                    Clear filters
-                  </button>
-                </Menu.Content>
-              </Menu.Portal>
-            </Menu.Root>
-          </div>
         ) : null}
         {j && present === null && !collapsed && view === "canvas" ? (
           <>

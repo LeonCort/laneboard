@@ -289,6 +289,7 @@ export function HiddenLanesControl({
       <Menu.Trigger
         className="lb-btn lb-btn--ghost lb-hidden-lanes"
         data-hidden-lanes-trigger
+        title={`${t("hiddenLanes")} (${hidden.length})`}
         aria-label={`${t("hiddenLanes")} (${hidden.length})`}
       >
         <EyeOff size={14} />

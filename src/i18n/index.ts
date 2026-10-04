@@ -96,6 +96,7 @@ export const en = {
   undo: "Undo",
   redo: "Redo",
   search: "Search this journey",
+  closeSearch: "Close search",
   filter: "Filters",
   noCustomer: "Map journeys, never personal customer data.",
   localNotice:
@@ -417,6 +418,7 @@ export const sv: Record<Key, string> = {
   undo: "Ångra",
   redo: "Gör om",
   search: "Sök i resan",
+  closeSearch: "Stäng sökning",
   filter: "Filter",
   noCustomer: "Kartlägg resor, aldrig personliga kunduppgifter.",
   localNotice:

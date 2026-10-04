@@ -91,7 +91,9 @@ test("journey title stays in the file panel and views work at narrow widths", as
     expect(title!.x).toBeGreaterThan(file!.x);
     expect(title!.x + title!.width).toBeLessThanOrEqual(file!.x + file!.width);
     expect(file!.x + file!.width).toBeLessThan(actions!.x);
-    expect(views!.y).toBeGreaterThanOrEqual(file!.y + file!.height);
+    expect(Math.abs(views!.y - file!.y)).toBeLessThan(1);
+    expect(views!.x).toBeGreaterThanOrEqual(file!.x + file!.width);
+    expect(views!.x + views!.width).toBeLessThan(actions!.x);
     await checkColumnAlignment(page);
     await page.getByRole("button", { name: "Overview", exact: true }).click();
     await expect(
