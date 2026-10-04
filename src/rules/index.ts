@@ -65,7 +65,9 @@ export function evaluateService(
           s === "browser-link"
             ? "opens a separate browser"
             : s === "info"
-              ? "is told to visit the web without a direct link"
+              ? channelPlatform(other) === "app"
+                ? "is told to visit the web without a direct link"
+                : "finds information only"
               : s === "planned"
                 ? "waits"
                 : "hits a dead end";

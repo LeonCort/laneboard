@@ -33,7 +33,9 @@ export function ServiceChannelFields({
     status = serviceStatus(journey, service, mode, lane.id),
     delivery = serviceDelivery(journey, service, mode, lane.id),
     web = channelPlatform(lane) === "web",
-    referral = status === "info" || status === "browser-link";
+    referral =
+      status === "browser-link" ||
+      (status === "info" && channelPlatform(lane) === "app");
   const details = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     if (expanded) details.current?.scrollIntoView({ block: "nearest" });
@@ -67,9 +69,15 @@ export function ServiceChannelFields({
           </option>
         ))}
       </Select>
-      {referral ? (
+      {status === "info" || status === "browser-link" ? (
         <p className="lb-field__hint">
-          {t(status === "browser-link" ? "browserLinkHint" : "informationHint")}
+          {t(
+            status === "browser-link"
+              ? "browserLinkHint"
+              : channelPlatform(lane) === "app"
+                ? "informationHint"
+                : "informationContentHint",
+          )}
         </p>
       ) : null}
       {web || referral ? (

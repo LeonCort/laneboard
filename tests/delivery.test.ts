@@ -194,3 +194,15 @@ it("supports an app without embedded webview capability through explicit channel
   app.channel.webviewHost = false;
   expect(channelPlatform(app)).toBe("app");
 });
+
+it("keeps web information content distinct from an app referral", () => {
+  useStore.getState().editJourney((j) => {
+    j.services[0].status.now.app = "native";
+    j.services[0].status.now.netbank = "info";
+  });
+  const notes = evaluateService(journey().services[0], journey(), "now").notes;
+  expect(notes.find((n) => n.rule === "R3")?.message).toContain(
+    "finds information only",
+  );
+  expect(notes.some((n) => n.rule === "R6" || n.rule === "R7")).toBe(false);
+});

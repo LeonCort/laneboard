@@ -162,6 +162,8 @@ export const en = {
   responsiveYes: "Responsive",
   responsiveNo: "Not responsive",
   deliveryDetails: "Channel characteristics",
+  informationContentHint:
+    "Provides information, but the service cannot be completed in this channel.",
   informationHint:
     "Tells the customer to visit the web; no direct link is offered.",
   browserLinkHint:
@@ -542,6 +544,8 @@ export const sv: Record<Key, string> = {
   responsiveYes: "Responsiv",
   responsiveNo: "Inte responsiv",
   deliveryDetails: "Kanalens egenskaper",
+  informationContentHint:
+    "Ger information, men tjänsten kan inte slutföras i den här kanalen.",
   informationHint: "Ber kunden att besöka webben; ingen direktlänk erbjuds.",
   browserLinkHint:
     "Erbjuder en direktlänk som öppnas i en separat webbläsare, utanför appen.",
