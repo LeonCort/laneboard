@@ -1,3 +1,9 @@
+import {
+  serviceStatus,
+  frictionReference,
+  flowAssessment,
+  targetState,
+} from "../model/analysis";
 import type { Node, Edge } from "@xyflow/react";
 import type { Journey, Mode, Layer, UIState } from "../model/schema";
 import { visibleSteps, evaluateService } from "../rules";
@@ -50,7 +56,10 @@ export function layout(
   dimJourney = false,
   filter?: { search: string; owner: string; severity: string; lane: string },
 ) {
-  const mode: Mode = ui.mode,
+  const mode: Mode =
+      ui.mode === "target" && targetState(j) === "not-started"
+        ? "now"
+        : ui.mode,
     active = new Set<Layer>(ui.layers),
     nodes: Node[] = [],
     edges: Edge[] = [],
@@ -88,19 +97,26 @@ export function layout(
       const dimmed = focus.length > 0 && !focus.includes(l.id);
       if (active.has("services") && l.channel?.type === "digital")
         for (const s of j.services.filter((s) => s.phase === p.id)) {
-          const status = s.status[mode][l.id] ?? "na";
-          if (status === "na") continue;
+          const status = serviceStatus(j, s, mode, l.id);
+          if (
+            status === "na" ||
+            (status === "unknown" &&
+              l.id !==
+                (s.placementLane ||
+                  j.lanes.find((l) => l.channel?.type === "digital")?.id))
+          )
+            continue;
           cards.push({
             kind: "service",
             entityId: s.id,
             lane: l.id,
             phase: p.id,
             text: s.name,
-            meta: s.isolated && !s.linksTo.length ? "isolated" : "linked",
+            meta:
+              flowAssessment(s) === "connected" ? "linked" : flowAssessment(s),
             status,
             changed: mode === "target" && status !== s.status.now[l.id],
-            critical:
-              status === "webview" && (!s.isolated || s.linksTo.length > 0),
+            critical: status === "webview" && flowAssessment(s) === "connected",
             dimmed:
               dimmed ||
               match(
@@ -136,6 +152,7 @@ export function layout(
         ))
           cards.push({
             kind: "friction",
+            reference: frictionReference(j, f.id),
             entityId: f.id,
             lane: l.id,
             phase: p.id,
@@ -223,7 +240,7 @@ export function layout(
                 a +
                 (heights.get(`${c.kind}-${c.entityId}-${c.lane}`) || 52) +
                 8,
-              16,
+              52,
             ) +
             (cellText
               ? Math.ceil(cellText.length / Math.max(20, (p.width - 24) / 6)) *
@@ -406,5 +423,16 @@ export function layout(
         ariaLabel: `Sketch ${s.kind}: ${s.text}`,
       });
     }
-  return { nodes, edges, rows, columns, width: totalWidth, height: y };
+  return {
+    nodes: nodes.map((node) => ({
+      ...node,
+      width: Number(node.style?.width),
+      height: Number(node.style?.height),
+    })),
+    edges,
+    rows,
+    columns,
+    width: totalWidth,
+    height: y,
+  };
 }

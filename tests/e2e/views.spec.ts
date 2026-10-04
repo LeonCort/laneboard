@@ -24,7 +24,7 @@ test("navigation remains available when tools close and can reopen them", async 
     "Journeys",
     "Library",
     "Definitions",
-    "Create with AI",
+    "Prepare AI prompt",
     "Settings",
     "Expand tools",
   ]) {
@@ -120,7 +120,7 @@ test("overview updates from the journey and restores canvas position and data dr
   await page.getByRole("button", { name: "View data", exact: true }).click();
   await expect(
     page.getByRole("tablist", { name: "Data views" }).getByRole("tab"),
-  ).toHaveCount(4);
+  ).toHaveCount(5);
   const before = await page
     .locator(".react-flow__viewport")
     .getAttribute("style");
@@ -130,16 +130,20 @@ test("overview updates from the journey and restores canvas position and data dr
   await page.getByRole("button", { name: "Target", exact: true }).click();
   await expect(page.getByTestId("overview-restarts")).toHaveText("0");
   await page.getByRole("button", { name: "Now", exact: true }).click();
-  await page.getByRole("button", { name: "Shared goal", exact: true }).click();
-  await expect(page.locator(".lb-cross-cutting")).toHaveText(
+  await expect(page.locator(".lb-overview")).toContainText(
     "More small businesses invest their surplus",
+  );
+  await expect(page.locator(".lb-overview")).not.toContainText(
+    "Local objectives",
   );
   const accessibility = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
   expect(accessibility.violations).toEqual([]);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  await expect(page.locator(".lb-drawer")).toBeVisible();
+  await expect(page.locator(".lb-drawer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Data", exact: true }).click();
+  await expect(page.locator(".lb-data-page")).toBeVisible();
   await expect(page.locator(".react-flow__viewport")).toHaveAttribute(
     "style",
     before!,
@@ -148,8 +152,7 @@ test("overview updates from the journey and restores canvas position and data dr
   await page.getByRole("button", { name: "Overview", exact: true }).click();
   await page
     .getByRole("button", {
-      name: "F2 Webviews only handle isolated tasks",
-      exact: true,
+      name: /F2 Webviews only handle isolated tasks/,
     })
     .click();
   await expect(page.locator("main")).toHaveAttribute("data-view", "canvas");

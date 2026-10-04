@@ -7,6 +7,7 @@ async function blankBank(page: Page, width = 1440) {
   await page
     .getByRole("button", { name: "Start with bank channels", exact: true })
     .click();
+  await page.getByRole("button", { name: "Skip setup", exact: true }).click();
   await expect(page.locator(".lb-sticky-phase")).toHaveCount(4);
   await page
     .getByRole("button", { name: "Collapse interface", exact: true })

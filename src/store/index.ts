@@ -5,6 +5,7 @@ import {
   blankWorkspace,
   newId,
   journeySchema,
+  workspaceSchema,
   type Workspace,
   type Journey,
   type FileData,
@@ -12,6 +13,7 @@ import {
   type Mode,
 } from "../model/schema";
 import { loadWorkspace, saveWorkspace } from "../persistence/db";
+import { targetSignature, targetState } from "../model/analysis";
 export type Selection = {
   kind:
     | "service"
@@ -54,7 +56,21 @@ export const useStore = create<State>()(
       saveError: "",
       selection: null,
       selectedIds: [],
-      edit: (fn) => set((s) => ({ workspace: produce(s.workspace, fn) })),
+      edit: (fn) =>
+        set((s) => ({
+          workspace: produce(s.workspace, (w) => {
+            fn(w);
+            for (const j of w.journeys) {
+              const before = s.workspace.journeys.find((x) => x.id === j.id);
+              if (
+                before?.targetState === "reviewed" &&
+                j.targetState === "reviewed" &&
+                targetSignature(before) !== targetSignature(j)
+              )
+                j.targetState = "draft";
+            }
+          }),
+        })),
       editJourney: (fn) => {
         const j = get().workspace.journeys.find(
           (j) => j.id === get().workspace.ui.selectedJourney,
@@ -213,6 +229,7 @@ export const useStore = create<State>()(
         const journey = journeySchema.parse({
           id: newId("journey"),
           title: "Untitled journey",
+          targetState: "not-started",
           phases,
           lanes,
           laneGroups:
@@ -242,6 +259,8 @@ export const useStore = create<State>()(
         get().edit((w) => {
           w.journeys.push(journey);
           w.ui.selectedJourney = journey.id;
+          w.ui.mode = "now";
+          delete w.ui.viewport;
         });
         get().select({ kind: "journey", id: journey.id });
       },
@@ -259,7 +278,7 @@ let saving = Promise.resolve();
 export async function hydrate() {
   try {
     const w = await loadWorkspace();
-    if (w) useStore.setState({ workspace: w });
+    if (w) useStore.setState({ workspace: workspaceSchema.parse(w) });
     useStore.setState({ ready: true });
     useStore.temporal.getState().clear();
   } catch (error) {
@@ -297,7 +316,12 @@ export function addCard(
 ) {
   const store = useStore.getState(),
     j = currentJourney(store);
-  if (!j || j.readOnly) return;
+  if (
+    !j ||
+    j.readOnly ||
+    (store.workspace.ui.mode === "target" && targetState(j) === "not-started")
+  )
+    return;
   const id = newId(kind);
   store.editJourney((j) => {
     switch (kind) {
@@ -305,17 +329,21 @@ export function addCard(
         const status = Object.fromEntries(
           j.lanes
             .filter((l) => l.channel?.type === "digital")
-            .map((l) => [
-              l.id,
-              l.id === lane ? ("native" as const) : ("na" as const),
-            ]),
+            .map((l) => [l.id, "unknown" as const]),
         );
         j.services.push({
           id,
           name: "New service",
           description: "",
           phase,
-          isolated: true,
+          isolated: false,
+          flowAssessment: "unknown",
+          placementLane: j.lanes.some(
+            (l) => l.id === lane && l.channel?.type === "digital",
+          )
+            ? lane
+            : j.lanes.find((l) => l.channel?.type === "digital")?.id,
+          evidence: "unknown",
           linksTo: [],
           capabilities: [],
           status: { now: { ...status }, target: { ...status } },
@@ -328,10 +356,19 @@ export function addCard(
           lane,
           phase,
           text: "New journey step",
-          in: "both",
+          in:
+            targetState(j) === "not-started" ? "both" : store.workspace.ui.mode,
           transition: {
-            now: j.steps.length ? "channel-switch" : "start",
-            target: j.steps.length ? "channel-switch" : "start",
+            now: j.steps.length
+              ? j.steps.at(-1)?.lane === lane
+                ? "continue"
+                : "channel-switch"
+              : "start",
+            target: j.steps.length
+              ? j.steps.at(-1)?.lane === lane
+                ? "continue"
+                : "channel-switch"
+              : "start",
           },
           notes: {},
         });
@@ -377,6 +414,68 @@ export function addCard(
     }
   });
   store.select({ kind, id, lane, phase });
+  return id;
+}
+export function createTargetFromNow() {
+  useStore.getState().editJourney((j) => {
+    if (targetState(j) !== "not-started") return;
+    j.services.forEach((s) => {
+      s.status.target = { ...s.status.now };
+    });
+    j.steps = j.steps.filter((s) => s.in !== "target");
+    j.steps.forEach((s) => {
+      s.in = "both";
+      s.textTarget = s.text;
+      s.transition.target = s.transition.now;
+      s.notes.target = s.notes.now;
+    });
+    j.experience.target = [...j.experience.now];
+    j.targetState = "draft";
+  });
+}
+export function addJourneyStep(
+  lane: string,
+  phase: string,
+  text: string,
+  afterId?: string,
+) {
+  const s = useStore.getState(),
+    j = currentJourney(s);
+  if (
+    !j ||
+    j.readOnly ||
+    !text.trim() ||
+    !j.lanes.some((l) => l.id === lane) ||
+    !j.phases.some((p) => p.id === phase) ||
+    (s.workspace.ui.mode === "target" && targetState(j) === "not-started")
+  )
+    return;
+  const id = newId("step");
+  s.editJourney((j) => {
+    const index = afterId
+      ? j.steps.findIndex((x) => x.id === afterId) + 1
+      : j.steps.length;
+    const previous = j.steps[index - 1];
+    const transition = !previous
+      ? "start"
+      : previous.lane === lane
+        ? "continue"
+        : j.lanes.find((l) => l.id === lane)?.channel?.type === "assisted"
+          ? "to-support"
+          : "channel-switch";
+    j.steps.splice(index, 0, {
+      id,
+      lane,
+      phase,
+      text: text.trim(),
+      in: targetState(j) === "not-started" ? "both" : s.workspace.ui.mode,
+      transition: { now: transition, target: transition },
+      notes: {},
+      evidence: "unknown",
+    });
+  });
+  s.select({ kind: "step", id, lane, phase });
+  return id;
 }
 export function deleteSelection() {
   const s = useStore.getState();

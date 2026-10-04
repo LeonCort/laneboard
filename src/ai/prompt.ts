@@ -9,14 +9,15 @@ The map spans the bank's channels. Think across silos: the customer's path, the 
 REQUIREMENTS
 - 4 to 7 phases, from need to deeper relationship.
 - Lanes: customer; entry points (other products, third parties); self-service (public website, mobile app, internet bank); assisted (customer service, advisor); backstage (enablers, support functions, insight); market (how others solve it).
-- Services: 3 to 8. Each needs status per digital channel for now and target: native | webview | info | missing | planned | na.
+- Services: 3 to 8. Each needs status per digital channel for now and target: unknown | native | webview | info | missing | planned | na.
 - A service is isolated only if it can be completed without linking on. If it links on, list linksTo and set isolated to false.
-- Steps: 6 to 10 ordered steps. Transitions: start | channel-switch | restart | to-support | lead-to-advisor | back-to-digital. Use in: now | target | both.
+- Steps: 6 to 10 ordered steps. Transitions: start | continue | channel-switch | restart | to-support | lead-to-advisor | back-to-digital. Use in: now | target | both.
 - Frictions: 3 to 8. Include now, recommendation, othersPattern if known.
 - Feeds: other products or third parties that lead in (entry), and support functions that inform a step (support).
 - Experience: -2 to 2 per phase in now and target.
 - Every reference must resolve. Every id must be unique in its list.
 - Do not invent statistics, prices or named competitors. Mark inferred frictions and lanes assumption: true.
+- Include customer, situation, hypothesis, testPlan and nextAction. Evidence is unknown | assumed | validated; generated hypotheses are assumed, never validated without evidence. Use unknown status and flowAssessment when availability or connectivity is not established. Set targetState: draft only when proposing an explicit Target; otherwise not-started.
 - Write in the language of the description.
 
 SCENARIO

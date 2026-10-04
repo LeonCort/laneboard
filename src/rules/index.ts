@@ -1,3 +1,4 @@
+import { serviceStatus, flowAssessment, targetState } from "../model/analysis";
 import type { Journey, Mode, Service } from "../model/schema";
 export type Severity = "none" | "medium" | "high";
 export interface RuleNote {
@@ -18,21 +19,22 @@ export function evaluateService(
     (l) => l.channel?.type === "digital" && l.channel.authenticated,
   );
   const applicable = auth.filter(
-    (l) => (service.status[mode][l.id] ?? "na") !== "na",
+    (l) =>
+      !["na", "unknown"].includes(serviceStatus(journey, service, mode, l.id)),
   );
   const available = (s: string) => s === "native" || s === "webview";
   const present = applicable.filter((l) =>
-    available(service.status[mode][l.id]),
+    available(serviceStatus(journey, service, mode, l.id)),
   );
-  const isolated = service.isolated && !service.linksTo.length;
+  const isolated = flowAssessment(service) === "isolated";
   const linked =
     service.linksTo
       .map((id) => journey.services.find((s) => s.id === id)?.name || id)
       .join(", ") || "the next task";
   for (const l of digital)
-    if (service.status[mode][l.id] === "webview") {
+    if (serviceStatus(journey, service, mode, l.id) === "webview") {
       capabilities.add("webview");
-      if (!isolated) {
+      if (flowAssessment(service) === "connected") {
         notes.push({
           rule: "R1",
           severity: "high",
@@ -40,7 +42,7 @@ export function evaluateService(
         });
         capabilities.add("context-sharing");
         capabilities.add("deep-linking");
-      } else
+      } else if (isolated)
         notes.push({
           rule: "R2",
           severity: "none",
@@ -50,7 +52,7 @@ export function evaluateService(
     }
   if (present.length === 1 && applicable.length > 1) {
     for (const other of applicable.filter((l) => l.id !== present[0].id)) {
-      const s = service.status[mode][other.id],
+      const s = serviceStatus(journey, service, mode, other.id),
         effect =
           s === "info"
             ? "is referred on"
@@ -59,7 +61,7 @@ export function evaluateService(
               : "hits a dead end";
       notes.push({
         rule: "R3",
-        severity: isolated ? "medium" : "high",
+        severity: flowAssessment(service) === "connected" ? "high" : "medium",
         message: `Only in ${present[0].name}. A customer in ${other.name} ${effect} and must switch channel.`,
       });
       if (other.channel?.type === "digital" && other.channel.webviewHost)
@@ -68,7 +70,9 @@ export function evaluateService(
           severity: "none",
           message: isolated
             ? `Can be offered in ${other.name} as a webview: the task is isolated.`
-            : `Webview is not an option in ${other.name}, because the flow links on to ${linked}.`,
+            : flowAssessment(service) === "unknown"
+              ? `Assess the flow connection before deciding whether a webview can support this task in ${other.name}.`
+              : `Webview is not an option in ${other.name}, because the flow links on to ${linked}.`,
         });
     }
     capabilities.add("session-handover");
@@ -81,8 +85,10 @@ export function evaluateService(
       message: "Not yet available in any logged-in channel.",
     });
   if (
-    !isolated &&
-    digital.some((l) => available(service.status[mode][l.id] ?? "na"))
+    flowAssessment(service) === "connected" &&
+    digital.some((l) =>
+      available(serviceStatus(journey, service, mode, l.id) ?? "na"),
+    )
   )
     capabilities.add("context-sharing");
   const severity: Severity = notes.some((n) => n.severity === "high")
@@ -93,17 +99,23 @@ export function evaluateService(
   return { severity, notes, capabilities: [...capabilities] };
 }
 export function visibleSteps(journey: Journey, mode: Mode) {
+  if (mode === "target" && targetState(journey) === "not-started") mode = "now";
   return journey.steps.filter((s) => s.in === "both" || s.in === mode);
 }
 export function kpis(journey: Journey, mode: Mode) {
+  if (mode === "target" && targetState(journey) === "not-started") mode = "now";
   const steps = visibleSteps(journey, mode),
     digital = journey.lanes.filter((l) => l.channel?.type === "digital");
   let native = 0,
-    applicable = 0;
+    applicable = 0,
+    unknown = 0,
+    excluded = 0;
   journey.services.forEach((s) =>
     digital.forEach((l) => {
-      const v = s.status[mode][l.id] ?? "na";
-      if (v !== "na") applicable++;
+      const v = serviceStatus(journey, s, mode, l.id);
+      if (v === "unknown") unknown++;
+      else if (v === "na") excluded++;
+      else applicable++;
       if (v === "native") native++;
     }),
   );
@@ -114,6 +126,8 @@ export function kpis(journey: Journey, mode: Mode) {
     coverage: applicable ? Math.round((native / applicable) * 100) : 0,
     native,
     applicable,
+    unknown,
+    excluded,
     servicesWithFriction: journey.services.filter(
       (s) => evaluateService(s, journey, mode).severity !== "none",
     ).length,

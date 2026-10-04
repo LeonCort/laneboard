@@ -66,3 +66,13 @@ it("keeps empty and fully hidden groups available without rendering their cells"
     ),
   ).toBe(false);
 });
+
+it("declares node dimensions before presentation can fit and paint cards", () => {
+  const j = structuredClone(investingExample.journeys[0]);
+  const graph = layout(j, uiSchema.parse({}), null);
+  expect(graph.nodes.length).toBeGreaterThan(0);
+  graph.nodes.forEach((node) => {
+    expect(node.width).toBeGreaterThan(0);
+    expect(node.height).toBeGreaterThan(0);
+  });
+});

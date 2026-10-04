@@ -1,25 +1,29 @@
-import { useState, useRef } from "react";
+import { JourneyList, TargetReview } from "../ui/Workflow";
 import {
-  X,
-  Printer,
-  Download,
-  ChevronUp,
-  ChevronDown,
-  ArrowRight,
-} from "lucide-react";
+  serviceStatus,
+  targetState,
+  frictionReference,
+  flowAssessment,
+  capabilityName,
+} from "../model/analysis";
+import { useState } from "react";
+import { X, Printer, Download, ArrowRight } from "lucide-react";
 import { useStore, currentJourney, type Selection } from "../store";
-import { reorder } from "../store/actions";
+
 import { useT } from "../i18n";
-import { evaluateService, visibleSteps } from "../rules";
-import { statuses, transitions, type Status } from "../model/schema";
+import { evaluateService, visibleSteps, kpis } from "../rules";
+import { statuses, type Status } from "../model/schema";
 import { exportCSV } from "../io/export";
-export type Tab = "services" | "frictions" | "capabilities" | "steps";
+export type Tab =
+  "services" | "frictions" | "capabilities" | "steps" | "comparison";
 export function Drawer({
   tab,
   setTab,
   onClose,
   onSelect,
+  fullPage = false,
 }: {
+  fullPage?: boolean;
   tab: Tab;
   setTab: (v: Tab) => void;
   onClose: () => void;
@@ -28,11 +32,12 @@ export function Drawer({
   const s = useStore(),
     t = useT(),
     j = currentJourney(s),
-    [height, setHeight] = useState(320),
-    drag = useRef("");
+    [height, setHeight] = useState(320);
   if (!j) return null;
   const mode = s.workspace.ui.mode,
-    disabled = j.readOnly,
+    metric = kpis(j, mode),
+    disabled =
+      j.readOnly || (mode === "target" && targetState(j) === "not-started"),
     digital = j.lanes.filter((l) => l.channel?.type === "digital"),
     results = j.services.map((service) => ({
       service,
@@ -41,66 +46,91 @@ export function Drawer({
   const caps = [...new Set(results.flatMap((r) => r.capabilities))];
   return (
     <section
-      className="lb-island lb-drawer lb-drawer-position"
+      className={`lb-island lb-drawer ${fullPage ? "lb-data-page" : "lb-drawer-position"}`}
       aria-label="Journey data"
-      style={{ height }}
+      style={fullPage ? undefined : { height }}
     >
-      <div
-        className="lb-drawer__handle"
-        role="separator"
-        aria-label="Resize data drawer"
-        aria-orientation="horizontal"
-        aria-valuenow={height}
-        aria-valuemin={180}
-        aria-valuemax={800}
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowUp") setHeight((h) => Math.min(800, h + 40));
-          if (e.key === "ArrowDown") setHeight((h) => Math.max(180, h - 40));
-        }}
-        onPointerDown={(e) => {
-          const start = e.clientY,
-            initial = height;
-          const move = (ev: PointerEvent) =>
-            setHeight(
-              Math.max(
-                180,
-                Math.min(
-                  window.innerHeight - 100,
-                  initial + start - ev.clientY,
+      {!fullPage ? (
+        <div
+          className="lb-drawer__handle"
+          role="separator"
+          aria-label="Resize data drawer"
+          aria-orientation="horizontal"
+          aria-valuenow={height}
+          aria-valuemin={180}
+          aria-valuemax={800}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp") setHeight((h) => Math.min(800, h + 40));
+            if (e.key === "ArrowDown") setHeight((h) => Math.max(180, h - 40));
+          }}
+          onPointerDown={(e) => {
+            const start = e.clientY,
+              initial = height;
+            const move = (ev: PointerEvent) =>
+              setHeight(
+                Math.max(
+                  180,
+                  Math.min(
+                    window.innerHeight - 100,
+                    initial + start - ev.clientY,
+                  ),
                 ),
-              ),
-            );
-          const up = () => {
-            window.removeEventListener("pointermove", move);
-            window.removeEventListener("pointerup", up);
-          };
-          window.addEventListener("pointermove", move);
-          window.addEventListener("pointerup", up);
-        }}
-      />
+              );
+            const up = () => {
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+          }}
+        />
+      ) : null}
+      <div className="lb-data-scope lb-caps">
+        {j.title} · {t(mode)}
+      </div>
+      <p className="lb-data-scope lb-field__hint">
+        {t("serviceFriction")}:{" "}
+        <span data-testid="kpi-serviceFriction">
+          {metric.servicesWithFriction}
+        </span>{" "}
+        · {t("coverage")}:{" "}
+        {metric.applicable
+          ? `${metric.coverage}% (${metric.native}/${metric.applicable})`
+          : t("unknown")}{" "}
+        · {t("unknownCount")}: {metric.unknown} · {t("excludedCount")}:{" "}
+        {metric.excluded}
+      </p>
       <div className="lb-drawer__head">
         <div className="lb-tabs" role="tablist" aria-label="Data views">
-          {(["services", "frictions", "capabilities", "steps"] as const).map(
-            (key) => (
-              <button
-                key={key}
-                role="tab"
-                className="lb-tab"
-                aria-selected={tab === key}
-                onClick={() => setTab(key)}
-              >
-                {t(key)}
-                <span className="lb-tab__count">
-                  {key === "capabilities"
+          {(
+            [
+              "steps",
+              "services",
+              "frictions",
+              "capabilities",
+              "comparison",
+            ] as const
+          ).map((key) => (
+            <button
+              key={key}
+              role="tab"
+              className="lb-tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+            >
+              {t(key)}
+              <span className="lb-tab__count">
+                {key === "comparison"
+                  ? ""
+                  : key === "capabilities"
                     ? caps.length
                     : key === "steps"
                       ? visibleSteps(j, mode).length
                       : j[key].length}
-                </span>
-              </button>
-            ),
-          )}
+              </span>
+            </button>
+          ))}
         </div>
         <div className="lb-dialog-actions">
           {tab === "services" || tab === "frictions" ? (
@@ -138,7 +168,7 @@ export function Drawer({
                 <th>
                   {t("name")} / {t("description")}
                 </th>
-                <th>{t("isolated")}</th>
+                <th>{t("flowAssessment")}</th>
                 <th>{t("links")}</th>
                 {digital.map((l) => (
                   <th key={l.id}>{l.name}</th>
@@ -167,19 +197,28 @@ export function Drawer({
                     </p>
                   </td>
                   <td>
-                    <input
-                      aria-label={`${r.service.name} isolated`}
-                      type="checkbox"
-                      checked={r.service.isolated}
+                    <select
+                      className="lb-select"
+                      aria-label={`${r.service.name} flow connection`}
+                      value={flowAssessment(r.service)}
                       disabled={disabled || r.service.linksTo.length > 0}
                       onChange={(e) =>
                         s.editJourney((j) => {
-                          j.services.find(
+                          const x = j.services.find(
                             (x) => x.id === r.service.id,
-                          )!.isolated = e.target.checked;
+                          )!;
+                          x.flowAssessment = e.target.value as
+                            "unknown" | "isolated" | "connected";
+                          x.isolated = e.target.value === "isolated";
                         })
                       }
-                    />
+                    >
+                      {["unknown", "isolated", "connected"].map((v) => (
+                        <option key={v} value={v}>
+                          {t(v)}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <div className="lb-link-select">
@@ -201,8 +240,10 @@ export function Drawer({
                                     : service.linksTo.filter(
                                         (id) => id !== other.id,
                                       );
-                                  if (e.target.checked)
+                                  if (e.target.checked) {
                                     service.isolated = false;
+                                    service.flowAssessment = "connected";
+                                  }
                                 })
                               }
                             />
@@ -216,7 +257,7 @@ export function Drawer({
                       <select
                         className="lb-select"
                         aria-label={`${r.service.name} — ${l.name} status`}
-                        value={r.service.status[mode][l.id] ?? "na"}
+                        value={serviceStatus(j, r.service, mode, l.id)}
                         disabled={disabled}
                         onChange={(e) =>
                           s.editJourney((j) => {
@@ -241,7 +282,7 @@ export function Drawer({
                     <ul className="lb-rule-list">
                       {r.notes.map((n, i) => (
                         <li className={n.positive ? "is-positive" : ""} key={i}>
-                          <b>{n.rule}</b> {n.message}
+                          {n.message}
                         </li>
                       ))}
                     </ul>
@@ -251,7 +292,7 @@ export function Drawer({
                       {r.capabilities.map((c) => (
                         <span className="lb-tag" key={c}>
                           {s.workspace.capabilities.find((x) => x.id === c)
-                            ?.name || c}
+                            ?.name || capabilityName(c)}
                         </span>
                       ))}
                     </div>
@@ -278,13 +319,19 @@ export function Drawer({
             </thead>
             <tbody>
               {j.frictions.map((f) => (
-                <tr key={f.id} aria-selected={s.selection?.id === f.id}>
+                <tr
+                  key={frictionReference(j, f.id)}
+                  aria-selected={s.selection?.id === f.id}
+                >
                   <td>
                     <button
                       className="lb-row-link"
                       onClick={() => onSelect({ kind: "friction", id: f.id })}
                     >
-                      <span className="lb-tag">{f.id}</span> {f.title}
+                      <span className="lb-tag">
+                        {frictionReference(j, f.id)}
+                      </span>{" "}
+                      {f.title}
                     </button>
                     {f.assumption ? (
                       <span className="lb-tag lb-tag--assumption">
@@ -320,7 +367,8 @@ export function Drawer({
             {caps.map((c) => (
               <div key={c} className="lb-view-card">
                 <h3>
-                  {s.workspace.capabilities.find((x) => x.id === c)?.name || c}
+                  {s.workspace.capabilities.find((x) => x.id === c)?.name ||
+                    capabilityName(c)}
                 </h3>
                 <p className="lb-field__hint">
                   {
@@ -348,131 +396,8 @@ export function Drawer({
             ))}
           </div>
         ) : null}
-        {tab === "steps" ? (
-          <table className="lb-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{t("steps")}</th>
-                <th>
-                  {t("lane")} / {t("phase")}
-                </th>
-                <th>
-                  {t("transition")} · {t(mode)}
-                </th>
-                <th>
-                  {t("notes")} · {t(mode)}
-                </th>
-                <th>{t("order")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleSteps(j, mode).map((step, i) => (
-                <tr
-                  key={step.id}
-                  aria-selected={s.selection?.id === step.id}
-                  draggable={!disabled}
-                  onDragStart={() => {
-                    drag.current = step.id;
-                  }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() =>
-                    s.editJourney((j) =>
-                      reorder(
-                        j.steps,
-                        j.steps.findIndex((x) => x.id === drag.current),
-                        j.steps.findIndex((x) => x.id === step.id),
-                      ),
-                    )
-                  }
-                >
-                  <td>{i + 1}</td>
-                  <td>
-                    <button
-                      className="lb-row-link"
-                      onClick={() => onSelect({ kind: "step", id: step.id })}
-                    >
-                      {mode === "target"
-                        ? step.textTarget || step.text
-                        : step.text}
-                    </button>
-                  </td>
-                  <td>
-                    {j.lanes.find((l) => l.id === step.lane)?.name}
-                    <p>{j.phases.find((p) => p.id === step.phase)?.name}</p>
-                  </td>
-                  <td>
-                    <select
-                      className="lb-select"
-                      aria-label={`${step.text} transition`}
-                      disabled={disabled}
-                      value={step.transition[mode] || "channel-switch"}
-                      onChange={(e) =>
-                        s.editJourney((j) => {
-                          j.steps.find((x) => x.id === step.id)!.transition[
-                            mode
-                          ] = e.target.value as (typeof transitions)[number];
-                        })
-                      }
-                    >
-                      {transitions.map((v) => (
-                        <option key={v}>{v}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <textarea
-                      className="lb-textarea"
-                      aria-label={`${step.text} notes`}
-                      disabled={disabled}
-                      value={step.notes[mode] || ""}
-                      onChange={(e) =>
-                        s.editJourney((j) => {
-                          j.steps.find((x) => x.id === step.id)!.notes[mode] =
-                            e.target.value;
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <div className="lb-dialog-actions">
-                      <button
-                        className="lb-iconbtn"
-                        disabled={disabled}
-                        aria-label={t("moveUp")}
-                        onClick={() =>
-                          s.editJourney((j) => {
-                            const index = j.steps.findIndex(
-                              (x) => x.id === step.id,
-                            );
-                            reorder(j.steps, index, index - 1);
-                          })
-                        }
-                      >
-                        <ChevronUp />
-                      </button>
-                      <button
-                        className="lb-iconbtn"
-                        disabled={disabled}
-                        aria-label={t("moveDown")}
-                        onClick={() =>
-                          s.editJourney((j) => {
-                            const index = j.steps.findIndex(
-                              (x) => x.id === step.id,
-                            );
-                            reorder(j.steps, index, index + 1);
-                          })
-                        }
-                      >
-                        <ChevronDown />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
+        {tab === "steps" ? <JourneyList /> : null}
+        {tab === "comparison" ? <TargetReview j={j} /> : null}
       </div>
     </section>
   );

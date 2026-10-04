@@ -6,12 +6,16 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  useViewport,
   type NodeProps,
   type EdgeProps,
   type Node,
 } from "@xyflow/react";
 import rough from "roughjs";
-import { useStore } from "../store";
+import * as Menu from "@radix-ui/react-dropdown-menu";
+import { Plus } from "lucide-react";
+import { useStore, currentJourney, addCard, type Selection } from "../store";
+import { targetState } from "../model/analysis";
 import { useT } from "../i18n";
 import type { CardData, CellData } from "./layout";
 import type { Key } from "../i18n";
@@ -21,6 +25,16 @@ export const CellNode = memo(function CellNode({
   const ownerIndex = useStore(
     (s) => s.workspace.owners.findIndex((o) => o.id === data.ownerIndex) + 1,
   );
+  const t = useT(),
+    s = useStore(),
+    j = currentJourney(s),
+    lane = j?.lanes.find((l) => l.id === data.lane);
+  const { zoom } = useViewport();
+  const disabled =
+    data.readOnly ||
+    (s.workspace.ui.mode === "target" &&
+      !!j &&
+      targetState(j) === "not-started");
   return (
     <div
       className="lb-cell lb-cell-node"
@@ -30,6 +44,56 @@ export const CellNode = memo(function CellNode({
       data-owned={!!data.ownerIndex}
       style={{ width: data.width, height: data.height }}
     >
+      {!disabled ? (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <button
+              className="lb-cell-add nodrag nopan"
+              style={{
+                transform: `scale(${1 / zoom})`,
+                transformOrigin: "bottom right",
+              }}
+              aria-label={`${t("addInCell")} · ${lane?.name} · ${j?.phases.find((p) => p.id === data.phase)?.name}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Plus size={18} />
+            </button>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Content
+              className="lb-popover lb-cell-menu"
+              sideOffset={4}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(
+                [
+                  "step",
+                  ...(lane?.channel?.type === "digital" ? ["service"] : []),
+                  "friction",
+                  "note",
+                  ...(j?.steps.length ? ["feed"] : []),
+                ] as Selection["kind"][]
+              ).map((kind) => (
+                <Menu.Item
+                  key={kind}
+                  className="lb-menu__item"
+                  onSelect={() => addCard(kind, data.lane, data.phase)}
+                >
+                  {t(
+                    {
+                      step: "toolStep",
+                      service: "toolService",
+                      friction: "toolFriction",
+                      note: "toolNote",
+                      feed: "toolFeed",
+                    }[kind as "step"],
+                  )}
+                </Menu.Item>
+              ))}
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
+      ) : null}
       {data.text ? (
         <span className="lb-cell__text lb-cell-bottom">{data.text}</span>
       ) : null}
@@ -61,7 +125,20 @@ export const CardNode = memo(function CardNode({
               ? j.feeds
               : j.notes;
         const x = list.find((x) => x.id === data.entityId);
-        if (x) x.text = text;
+        if (x) {
+          if (
+            data.kind === "step" &&
+            useStore.getState().workspace.ui.mode === "target" &&
+            "textTarget" in x
+          )
+            x.textTarget = text;
+          else if (
+            data.kind === "step" &&
+            useStore.getState().workspace.ui.mode === "target"
+          )
+            Object.assign(x, { textTarget: text });
+          else x.text = text;
+        }
       }
     });
     setEditing(false);
@@ -90,7 +167,7 @@ export const CardNode = memo(function CardNode({
       <div className="lb-card-content">
         <div className="lb-card-heading">
           {data.kind === "friction" ? (
-            <span className="lb-friction__id">{data.entityId}</span>
+            <span className="lb-friction__id">{data.reference as string}</span>
           ) : null}
           <span
             onDoubleClick={(e) => {

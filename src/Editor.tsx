@@ -1,3 +1,6 @@
+import { JourneySetup, TargetReview } from "./ui/Workflow";
+import { ResponsivePanel } from "./ui/ResponsivePanel";
+import { targetState } from "./model/analysis";
 import {
   useCallback,
   useEffect,
@@ -145,7 +148,7 @@ function EditorInner() {
   const [dialog, setDialog] = useState<DialogName>(null),
     [importRaw, setImportRaw] = useState<string>(),
     [drawer, setDrawer] = useState<Tab | null>(null),
-    [view, setView] = useState<"canvas" | "overview">("canvas"),
+    [view, setView] = useState<"canvas" | "data" | "overview">("canvas"),
     [canvasSize, setCanvasSize] = useState({
       width: window.innerWidth,
       height: window.innerHeight,
@@ -170,13 +173,50 @@ function EditorInner() {
       run: () => void;
     } | null>(null),
     [space, setSpace] = useState(false);
+  const [sheet, setSheet] = useState<"tools" | "details" | null>(null);
+  const seenJourneys = useRef(new Set(s.workspace.journeys.map((j) => j.id)));
+  const narrow = canvasSize.width <= 960;
+  useEffect(() => {
+    if (
+      j &&
+      s.workspace.ui.mode === "target" &&
+      targetState(j) === "not-started"
+    )
+      setDialog("target");
+  }, [j, s.workspace.ui.mode]);
+  useEffect(() => {
+    if (
+      j &&
+      !seenJourneys.current.has(j.id) &&
+      j.title === "Untitled journey" &&
+      targetState(j) === "not-started"
+    )
+      setDialog("setup");
+    seenJourneys.current = new Set(s.workspace.journeys.map((j) => j.id));
+  }, [j, s.workspace.journeys]);
+  const selectionId = s.selection?.id,
+    selectionKind = s.selection?.kind;
+  const previousDetailSelection = useRef(selectionId);
+  useEffect(() => {
+    if (
+      (narrow || collapsed) &&
+      selectionId &&
+      previousDetailSelection.current !== selectionId &&
+      selectionKind &&
+      ["service", "step", "friction", "feed", "note", "sketch"].includes(
+        selectionKind,
+      )
+    )
+      setSheet("details");
+    previousDetailSelection.current = selectionId;
+  }, [narrow, collapsed, selectionId, selectionKind]);
   const [nodes, setNodes] = useState<Node[]>([]),
     dragId = useRef(""),
     toastTimer = useRef<ReturnType<typeof setTimeout>>(),
     originalPresent = useRef<{
       layers: Layer[];
       viewport: typeof viewport;
-      view: "canvas" | "overview";
+      view: "canvas" | "data" | "overview";
     } | null>(null),
     editorRef = useRef<HTMLElement>(null),
     guideRef = useRef<HTMLDivElement>(null),
@@ -222,7 +262,7 @@ function EditorInner() {
     setConfirmAction({ title, run });
     setDialog("confirm");
   }, []);
-  const sequence = j ? presentationFor(j) : [],
+  const sequence = useMemo(() => (j ? presentationFor(j) : []), [j]),
     slide = present !== null ? sequence[present] : undefined;
   const effectiveUI = useMemo(
     () =>
@@ -451,19 +491,46 @@ function EditorInner() {
     setPicker(null);
   };
   const fit = () => {
-    if (graph)
-      flow.fitView({
-        nodes: graph.nodes.filter((n) => n.type === "cell"),
-        padding: 0.28,
-        maxZoom: 1,
-        minZoom: 0.12,
-        duration: 180,
-      });
+    if (!graph) return;
+    const cells = graph.nodes.filter((n) => n.type === "cell");
+    if (!cells.length) return;
+    const fitted = getViewportForBounds(
+      getNodesBounds(cells),
+      Math.max(100, canvasSize.width - columnLeft - rightInset),
+      Math.max(
+        100,
+        canvasSize.height - laneTop - (narrow && !collapsed ? 154 : 94),
+      ),
+      0.1,
+      1,
+      0.04,
+    );
+    void flow.setViewport(
+      { ...fitted, x: fitted.x + columnLeft, y: fitted.y + laneTop },
+      { duration: 180 },
+    );
   };
   const onChanges = useCallback(
     (changes: NodeChange[]) => setNodes((ns) => applyNodeChanges(changes, ns)),
     [],
   );
+  const onSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
+    const ids = [
+      ...new Set(
+        nodes
+          .filter((n) => n.type === "card" || n.type === "sketch")
+          .map((n) => String(n.data.entityId || n.data.id)),
+      ),
+    ];
+    const previous = useStore.getState().selectedIds;
+    if (
+      ids.length > 1 &&
+      (ids.length !== previous.length ||
+        ids.some((id, i) => id !== previous[i]))
+    ) {
+      useStore.setState({ selectedIds: ids });
+    }
+  }, []);
   const onDragStop = (_: unknown, node: Node, dragged: Node[]) => {
     const list = dragged?.length ? dragged : [node];
     s.editJourney((j) => {
@@ -695,7 +762,7 @@ function EditorInner() {
         id: `view-${v}`,
         label: `Open ${t(v)} view`,
         run: () => {
-          setView("canvas");
+          setView("data");
           setDrawer(v);
         },
       }),
@@ -814,6 +881,11 @@ function EditorInner() {
         return;
       }
       const active = document.activeElement;
+      if (
+        e.target instanceof HTMLElement &&
+        e.target.closest('[role="dialog"], [role="menu"]')
+      )
+        return;
       if (active instanceof HTMLElement && active.closest(".lb-lane-popover"))
         return;
       if (
@@ -840,7 +912,7 @@ function EditorInner() {
       const mod = e.metaKey || e.ctrlKey,
         k = e.key.toLowerCase();
       if (mod) {
-        if (view === "overview" && !["z", "k", "\\"].includes(k)) return;
+        if (view !== "canvas" && !["z", "k", "\\"].includes(k)) return;
         if (k === "z") {
           e.preventDefault();
           if (e.shiftKey) useStore.temporal.getState().redo();
@@ -873,7 +945,7 @@ function EditorInner() {
         s.setMode(s.workspace.ui.mode === "now" ? "target" : "now");
         return;
       }
-      if (view === "overview") {
+      if (view !== "canvas") {
         if (e.key === "?") setDialog("help");
         return;
       }
@@ -919,6 +991,7 @@ function EditorInner() {
       ref={editorRef}
       className="lb-editor"
       data-view={view}
+      data-present={present !== null}
       aria-label="Laneboard editor"
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) e.preventDefault();
@@ -999,6 +1072,7 @@ function EditorInner() {
                 phase: c.phase,
               });
           } else if (node.type === "card") {
+            if (narrow || collapsed) setSheet("details");
             const c = node.data as CardData;
             s.select({
               kind: c.kind,
@@ -1025,12 +1099,7 @@ function EditorInner() {
             );
           else s.select(null);
         }}
-        onSelectionChange={({ nodes }) => {
-          const ids = nodes
-            .filter((n) => n.type === "card" || n.type === "sketch")
-            .map((n) => String(n.data.entityId || n.data.id));
-          if (ids.length > 1) useStore.setState({ selectedIds: ids });
-        }}
+        onSelectionChange={onSelectionChange}
         aria-label="Journey canvas"
         proOptions={{ hideAttribution: false }}
       >
@@ -1123,7 +1192,7 @@ function EditorInner() {
             >
               {graph.rows.map((row) => (
                 <div
-                  key={row.id}
+                  key={`${row.kind}-${row.id}`}
                   className={`lb-sticky-row lb-sticky-row--${row.kind}`}
                   style={{
                     top: viewport.y - laneTop + row.y * viewport.zoom,
@@ -1206,6 +1275,7 @@ function EditorInner() {
               onClick={() => {
                 setView("canvas");
                 s.select({ kind: "journey", id: j.id });
+                if (narrow || collapsed) setSheet("details");
               }}
             >
               <span className="lb-filepill__context">
@@ -1275,10 +1345,10 @@ function EditorInner() {
           <Panel
             position="top-left"
             className="lb-island lb-view-switch"
-            style={{ left: view === "overview" ? 16 : leftX }}
+            style={{ left: view !== "canvas" ? 16 : leftX }}
           >
             <div className="lb-segmented" aria-label={t("journeyViews")}>
-              {(["canvas", "overview"] as const).map((name) => (
+              {(["canvas", "data", "overview"] as const).map((name) => (
                 <button
                   key={name}
                   aria-pressed={view === name}
@@ -1292,6 +1362,16 @@ function EditorInner() {
               <>
                 <AddLaneButton key={j.id} journey={j} reveal={revealLane} />
                 <HiddenLanesControl journey={j} reveal={revealLane} />
+                <button
+                  className="lb-iconbtn"
+                  aria-label={t("editDetails")}
+                  onClick={() => {
+                    if (!s.selection) s.select({ kind: "journey", id: j.id });
+                    if (narrow || collapsed) setSheet("details");
+                  }}
+                >
+                  {<SlidersHorizontal size={16} />}
+                </button>
               </>
             ) : null}
           </Panel>
@@ -1302,7 +1382,15 @@ function EditorInner() {
               <button
                 key={mode}
                 aria-pressed={s.workspace.ui.mode === mode}
-                onClick={() => s.setMode(mode)}
+                onClick={() => {
+                  s.setMode(mode);
+                  if (
+                    mode === "target" &&
+                    j &&
+                    targetState(j) === "not-started"
+                  )
+                    setDialog("target");
+                }}
               >
                 {t(mode)}
               </button>
@@ -1341,6 +1429,7 @@ function EditorInner() {
                   run: () => {
                     setRail("journeys");
                     setCollapsed(false);
+                    if (narrow) setSheet("tools");
                   },
                 },
                 {
@@ -1350,6 +1439,7 @@ function EditorInner() {
                   run: () => {
                     setRail("library");
                     setCollapsed(false);
+                    if (narrow) setSheet("tools");
                   },
                 },
                 {
@@ -1387,406 +1477,432 @@ function EditorInner() {
                 className="lb-rail__btn"
                 aria-label={t(collapsed ? "expandUI" : "toggleUI")}
                 aria-expanded={!collapsed}
-                onClick={() => setCollapsed((value) => !value)}
+                onClick={() => {
+                  setCollapsed((value) => !value);
+                  if (narrow && collapsed) setSheet("tools");
+                }}
               >
                 {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
                 {t(collapsed ? "expand" : "close")}
               </button>
             </nav>
             {j && !collapsed ? (
-              <aside
-                className="lb-island lb-leftpanel lb-left-position"
-                aria-label="Journeys and layers"
+              <ResponsivePanel
+                narrow={narrow}
+                open={sheet === "tools"}
+                title={t(rail)}
+                onClose={() => setSheet(null)}
               >
-                {rail === "library" ? (
-                  <>
-                    <div className="lb-section">
-                      <div className="lb-section__head">{t("library")}</div>
-                      <div className="lb-library-grid">
-                        {toolSpec.slice(2).map((a) => (
-                          <button
-                            key={a.id}
-                            className="lb-library-item"
-                            disabled={j.readOnly}
-                            onClick={() => place(a.id)}
-                          >
-                            <a.icon size={18} />
-                            {t(a.label)}
-                            <kbd className="lb-kbd">{a.key}</kbd>
-                          </button>
-                        ))}
+                <aside
+                  className="lb-island lb-leftpanel lb-left-position"
+                  aria-label="Journeys and layers"
+                >
+                  {rail === "library" ? (
+                    <>
+                      <div className="lb-section">
+                        <div className="lb-section__head">{t("library")}</div>
+                        <div className="lb-library-grid">
+                          {toolSpec.slice(2).map((a) => (
+                            <button
+                              key={a.id}
+                              className="lb-library-item"
+                              disabled={j.readOnly}
+                              onClick={() => place(a.id)}
+                            >
+                              <a.icon size={18} />
+                              {t(a.label)}
+                              <kbd className="lb-kbd">{a.key}</kbd>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    <div className="lb-section">
-                      <div className="lb-section__head">{t("structure")}</div>
-                      <button
-                        className="lb-menu__item"
-                        onClick={addLane}
-                        disabled={j.readOnly}
-                      >
-                        <Plus size={14} />
-                        {t("addLane")}
-                      </button>
-                      <button
-                        className="lb-menu__item"
-                        onClick={addPhase}
-                        disabled={j.readOnly}
-                      >
-                        <Plus size={14} />
-                        {t("addPhase")}
-                      </button>
-                      <button
-                        className="lb-menu__item"
-                        onClick={addGroup}
-                        disabled={j.readOnly}
-                      >
-                        <Plus size={14} />
-                        {t("addGroup")}
-                      </button>
-                    </div>
-                    <div className="lb-section">
-                      <div className="lb-section__head">{t("templates")}</div>
-                      <button
-                        className="lb-menu__item"
-                        onClick={() => s.newJourney("bank")}
-                      >
-                        {t("startBank")}
-                      </button>
-                      <button
-                        className="lb-menu__item"
-                        onClick={() => s.newJourney("blank")}
-                      >
-                        {t("startBlank")}
-                      </button>
-                      <button
-                        className="lb-menu__item"
-                        onClick={() => loadExample("mortgage")}
-                      >
-                        {t("loadMortgage")}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="lb-section">
-                      <div className="lb-section__head">
-                        {t("journeys")}
+                      <div className="lb-section">
+                        <div className="lb-section__head">{t("structure")}</div>
                         <button
-                          className="lb-iconbtn"
-                          aria-label={t("newJourney")}
-                          onClick={() => setDialog("new")}
+                          className="lb-menu__item"
+                          onClick={addLane}
+                          disabled={j.readOnly}
                         >
-                          <Plus />
+                          <Plus size={14} />
+                          {t("addLane")}
+                        </button>
+                        <button
+                          className="lb-menu__item"
+                          onClick={addPhase}
+                          disabled={j.readOnly}
+                        >
+                          <Plus size={14} />
+                          {t("addPhase")}
+                        </button>
+                        <button
+                          className="lb-menu__item"
+                          onClick={addGroup}
+                          disabled={j.readOnly}
+                        >
+                          <Plus size={14} />
+                          {t("addGroup")}
                         </button>
                       </div>
-                      <div
-                        className="lb-tree"
-                        role="list"
-                        aria-label={t("journeys")}
-                      >
-                        {s.workspace.journeys.map((x) => (
-                          <div
-                            className="lb-tree__row lb-journey-row"
-                            key={x.id}
-                            role="listitem"
-                            data-selected={x.id === j.id}
-                          >
-                            <button
-                              className="lb-tree__label lb-tree-button"
-                              title={x.title}
-                              onClick={() => {
-                                setUI((ui) => {
-                                  ui.selectedJourney = x.id;
-                                  delete ui.viewport;
-                                });
-                                s.select(null);
-                              }}
-                            >
-                              {x.title}
-                            </button>
-                            {x.readOnly ? <Lock size={12} /> : null}
-                            <Menu.Root>
-                              <Menu.Trigger
-                                className="lb-iconbtn"
-                                aria-label={`Actions for ${x.title}`}
-                              >
-                                <MoreHorizontal />
-                              </Menu.Trigger>
-                              <Menu.Portal>
-                                <Menu.Content className="lb-popover lb-menu">
-                                  <Menu.Item
-                                    className="lb-menu__item"
-                                    onSelect={() => {
-                                      setUI((ui) => {
-                                        ui.selectedJourney = x.id;
-                                      });
-                                      s.duplicateJourney();
-                                    }}
-                                  >
-                                    Duplicate
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    className="lb-menu__item"
-                                    disabled={x.readOnly}
-                                    onSelect={() => {
-                                      setUI((ui) => {
-                                        ui.selectedJourney = x.id;
-                                      });
-                                      s.select({ kind: "journey", id: x.id });
-                                    }}
-                                  >
-                                    Rename
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    className="lb-menu__item lb-danger-text"
-                                    onSelect={() =>
-                                      confirm(
-                                        `${t("delete")} “${x.title}”`,
-                                        () =>
-                                          s.edit((w) => {
-                                            w.journeys = w.journeys.filter(
-                                              (j) => j.id !== x.id,
-                                            );
-                                            if (w.ui.selectedJourney === x.id)
-                                              w.ui.selectedJourney =
-                                                w.journeys[0]?.id || "";
-                                          }),
-                                      )
-                                    }
-                                  >
-                                    {t("delete")}
-                                  </Menu.Item>
-                                </Menu.Content>
-                              </Menu.Portal>
-                            </Menu.Root>
-                          </div>
-                        ))}
+                      <div className="lb-section">
+                        <div className="lb-section__head">{t("templates")}</div>
+                        <button
+                          className="lb-menu__item"
+                          onClick={() => s.newJourney("bank")}
+                        >
+                          {t("startBank")}
+                        </button>
+                        <button
+                          className="lb-menu__item"
+                          onClick={() => s.newJourney("blank")}
+                        >
+                          {t("startBlank")}
+                        </button>
+                        <button
+                          className="lb-menu__item"
+                          onClick={() => loadExample("mortgage")}
+                        >
+                          {t("loadMortgage")}
+                        </button>
                       </div>
-                    </div>
-                    <div className="lb-section lb-section--grow">
-                      <div className="lb-section__head">
-                        {t("lanes")}
-                        <div className="lb-section__actions">
+                    </>
+                  ) : (
+                    <>
+                      <div className="lb-section">
+                        <div className="lb-section__head">
+                          {t("journeys")}
                           <button
                             className="lb-iconbtn"
-                            disabled={j.readOnly}
-                            aria-label={t("addGroup")}
-                            onClick={addGroup}
-                          >
-                            <Layers />
-                          </button>
-                          <button
-                            className="lb-iconbtn"
-                            disabled={j.readOnly}
-                            aria-label={t("addLane")}
-                            onClick={addLane}
+                            aria-label={t("newJourney")}
+                            onClick={() => setDialog("new")}
                           >
                             <Plus />
                           </button>
                         </div>
-                      </div>
-                      <div className="lb-tree">
-                        {[null, ...j.laneGroups.map((g) => g.id)].map(
-                          (group) => (
-                            <div key={group || "ungrouped"}>
-                              {group ? (
-                                <div
-                                  className="lb-tree__row"
-                                  data-expanded={
-                                    !s.workspace.ui.collapsedGroups.includes(
-                                      group,
-                                    )
-                                  }
+                        <div
+                          className="lb-tree"
+                          role="list"
+                          aria-label={t("journeys")}
+                        >
+                          {s.workspace.journeys.map((x) => (
+                            <div
+                              className="lb-tree__row lb-journey-row"
+                              key={x.id}
+                              role="listitem"
+                              data-selected={x.id === j.id}
+                            >
+                              <button
+                                className="lb-tree__label lb-tree-button"
+                                title={x.title}
+                                onClick={() => {
+                                  setUI((ui) => {
+                                    ui.selectedJourney = x.id;
+                                    delete ui.viewport;
+                                  });
+                                  s.select(null);
+                                }}
+                              >
+                                {x.title}
+                              </button>
+                              {x.readOnly ? <Lock size={12} /> : null}
+                              <Menu.Root>
+                                <Menu.Trigger
+                                  className="lb-iconbtn"
+                                  aria-label={`Actions for ${x.title}`}
                                 >
-                                  <button
-                                    className="lb-tree-button lb-tree-group-button"
-                                    onClick={() => toggleGroup(group)}
-                                  >
-                                    <ChevronDown className="lb-tree__caret" />
-                                    <span className="lb-tree__group">
-                                      {
-                                        j.laneGroups.find((g) => g.id === group)
-                                          ?.name
+                                  <MoreHorizontal />
+                                </Menu.Trigger>
+                                <Menu.Portal>
+                                  <Menu.Content className="lb-popover lb-menu">
+                                    <Menu.Item
+                                      className="lb-menu__item"
+                                      onSelect={() => {
+                                        setUI((ui) => {
+                                          ui.selectedJourney = x.id;
+                                        });
+                                        s.duplicateJourney();
+                                      }}
+                                    >
+                                      Duplicate
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      className="lb-menu__item"
+                                      disabled={x.readOnly}
+                                      onSelect={() => {
+                                        setUI((ui) => {
+                                          ui.selectedJourney = x.id;
+                                        });
+                                        s.select({ kind: "journey", id: x.id });
+                                      }}
+                                    >
+                                      Rename
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      className="lb-menu__item lb-danger-text"
+                                      onSelect={() =>
+                                        confirm(
+                                          `${t("delete")} “${x.title}”`,
+                                          () =>
+                                            s.edit((w) => {
+                                              w.journeys = w.journeys.filter(
+                                                (j) => j.id !== x.id,
+                                              );
+                                              if (w.ui.selectedJourney === x.id)
+                                                w.ui.selectedJourney =
+                                                  w.journeys[0]?.id || "";
+                                            }),
+                                        )
                                       }
-                                    </span>
-                                  </button>
-                                  <AddLaneButton
-                                    key={j.id}
-                                    journey={j}
-                                    group={group}
-                                    reveal={revealLane}
-                                  />
-                                  <button
-                                    className="lb-iconbtn"
-                                    aria-label={`Edit group ${group}`}
-                                    onClick={() =>
-                                      s.select({ kind: "group", id: group })
+                                    >
+                                      {t("delete")}
+                                    </Menu.Item>
+                                  </Menu.Content>
+                                </Menu.Portal>
+                              </Menu.Root>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="lb-section lb-section--grow">
+                        <div className="lb-section__head">
+                          {t("lanes")}
+                          <div className="lb-section__actions">
+                            <button
+                              className="lb-iconbtn"
+                              disabled={j.readOnly}
+                              aria-label={t("addGroup")}
+                              onClick={addGroup}
+                            >
+                              <Layers />
+                            </button>
+                            <button
+                              className="lb-iconbtn"
+                              disabled={j.readOnly}
+                              aria-label={t("addLane")}
+                              onClick={addLane}
+                            >
+                              <Plus />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="lb-tree">
+                          {[null, ...j.laneGroups.map((g) => g.id)].map(
+                            (group) => (
+                              <div key={group || "ungrouped"}>
+                                {group ? (
+                                  <div
+                                    className="lb-tree__row"
+                                    data-expanded={
+                                      !s.workspace.ui.collapsedGroups.includes(
+                                        group,
+                                      )
                                     }
                                   >
-                                    <MoreHorizontal />
-                                  </button>
-                                </div>
-                              ) : null}
-                              {!s.workspace.ui.collapsedGroups.includes(
-                                group || "",
-                              )
-                                ? j.lanes
-                                    .filter((l) => l.group === group)
-                                    .map((l) => (
-                                      <div
-                                        key={l.id}
-                                        className="lb-tree__row"
-                                        style={
-                                          {
-                                            "--depth": group ? 1 : 0,
-                                          } as CSSProperties
+                                    <button
+                                      className="lb-tree-button lb-tree-group-button"
+                                      onClick={() => toggleGroup(group)}
+                                    >
+                                      <ChevronDown className="lb-tree__caret" />
+                                      <span className="lb-tree__group">
+                                        {
+                                          j.laneGroups.find(
+                                            (g) => g.id === group,
+                                          )?.name
                                         }
-                                        data-hidden={l.hidden}
-                                        draggable={!j.readOnly}
-                                        onDragStart={() => {
-                                          dragId.current = l.id;
-                                        }}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={() =>
-                                          s.editJourney((j) => {
-                                            const moved = j.lanes.find(
-                                              (x) => x.id === dragId.current,
-                                            );
-                                            if (moved) moved.group = l.group;
-                                            reorder(
-                                              j.lanes,
-                                              j.lanes.findIndex(
-                                                (x) => x.id === dragId.current,
-                                              ),
-                                              j.lanes.findIndex(
-                                                (x) => x.id === l.id,
-                                              ),
-                                            );
-                                          })
-                                        }
-                                      >
-                                        <span
-                                          className="lb-tree__swatch"
+                                      </span>
+                                    </button>
+                                    <AddLaneButton
+                                      key={j.id}
+                                      journey={j}
+                                      group={group}
+                                      reveal={revealLane}
+                                    />
+                                    <button
+                                      className="lb-iconbtn"
+                                      aria-label={`Edit group ${group}`}
+                                      onClick={() =>
+                                        s.select({ kind: "group", id: group })
+                                      }
+                                    >
+                                      <MoreHorizontal />
+                                    </button>
+                                  </div>
+                                ) : null}
+                                {!s.workspace.ui.collapsedGroups.includes(
+                                  group || "",
+                                )
+                                  ? j.lanes
+                                      .filter((l) => l.group === group)
+                                      .map((l) => (
+                                        <div
+                                          key={l.id}
+                                          className="lb-tree__row"
                                           style={
                                             {
-                                              "--tint": `var(--tint-${l.tint || l.group || l.kind})`,
+                                              "--depth": group ? 1 : 0,
                                             } as CSSProperties
                                           }
-                                        />
-                                        <button
-                                          className="lb-tree__label lb-tree-button"
-                                          onClick={() =>
-                                            s.select({ kind: "lane", id: l.id })
+                                          data-hidden={l.hidden}
+                                          draggable={!j.readOnly}
+                                          onDragStart={() => {
+                                            dragId.current = l.id;
+                                          }}
+                                          onDragOver={(e) => e.preventDefault()}
+                                          onDrop={() =>
+                                            s.editJourney((j) => {
+                                              const moved = j.lanes.find(
+                                                (x) => x.id === dragId.current,
+                                              );
+                                              if (moved) moved.group = l.group;
+                                              reorder(
+                                                j.lanes,
+                                                j.lanes.findIndex(
+                                                  (x) =>
+                                                    x.id === dragId.current,
+                                                ),
+                                                j.lanes.findIndex(
+                                                  (x) => x.id === l.id,
+                                                ),
+                                              );
+                                            })
                                           }
                                         >
-                                          {l.name}
-                                        </button>
-                                        <div className="lb-tree__toggles">
+                                          <span
+                                            className="lb-tree__swatch"
+                                            style={
+                                              {
+                                                "--tint": `var(--tint-${l.tint || l.group || l.kind})`,
+                                              } as CSSProperties
+                                            }
+                                          />
                                           <button
-                                            className="lb-iconbtn"
-                                            aria-label={`${l.hidden ? t("show") : t("hide")} ${l.name}`}
-                                            disabled={j.readOnly}
+                                            className="lb-tree__label lb-tree-button"
                                             onClick={() =>
-                                              s.editJourney((j) => {
-                                                const x = j.lanes.find(
-                                                  (x) => x.id === l.id,
-                                                )!;
-                                                x.hidden = !x.hidden;
+                                              s.select({
+                                                kind: "lane",
+                                                id: l.id,
                                               })
                                             }
                                           >
-                                            {l.hidden ? <EyeOff /> : <Eye />}
+                                            {l.name}
                                           </button>
-                                          <button
-                                            className="lb-iconbtn"
-                                            aria-label={`${t("locked")} ${l.name}`}
-                                            disabled={j.readOnly}
-                                            onClick={() =>
-                                              s.editJourney((j) => {
-                                                const x = j.lanes.find(
-                                                  (x) => x.id === l.id,
-                                                )!;
-                                                x.locked = !x.locked;
-                                              })
-                                            }
-                                          >
-                                            <Lock />
-                                          </button>
+                                          <div className="lb-tree__toggles">
+                                            <button
+                                              className="lb-iconbtn"
+                                              aria-label={`${l.hidden ? t("show") : t("hide")} ${l.name}`}
+                                              disabled={j.readOnly}
+                                              onClick={() =>
+                                                s.editJourney((j) => {
+                                                  const x = j.lanes.find(
+                                                    (x) => x.id === l.id,
+                                                  )!;
+                                                  x.hidden = !x.hidden;
+                                                })
+                                              }
+                                            >
+                                              {l.hidden ? <EyeOff /> : <Eye />}
+                                            </button>
+                                            <button
+                                              className="lb-iconbtn"
+                                              aria-label={`${t("locked")} ${l.name}`}
+                                              disabled={j.readOnly}
+                                              onClick={() =>
+                                                s.editJourney((j) => {
+                                                  const x = j.lanes.find(
+                                                    (x) => x.id === l.id,
+                                                  )!;
+                                                  x.locked = !x.locked;
+                                                })
+                                              }
+                                            >
+                                              <Lock />
+                                            </button>
+                                          </div>
                                         </div>
-                                      </div>
-                                    ))
-                                : null}
-                            </div>
-                          ),
-                        )}
-                      </div>
-                      <div className="lb-section__head">
-                        {t("phases")}
-                        <button
-                          className="lb-iconbtn"
-                          disabled={j.readOnly}
-                          aria-label={t("addPhase")}
-                          onClick={addPhase}
-                        >
-                          <Plus />
-                        </button>
-                      </div>
-                      {j.phases.map((p, i) => (
-                        <div
-                          className="lb-tree__row"
-                          key={p.id}
-                          draggable={!j.readOnly}
-                          onDragStart={() => {
-                            dragId.current = p.id;
-                          }}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={() =>
-                            s.editJourney((j) =>
-                              reorderPhase(
-                                j,
-                                j.phases.findIndex(
-                                  (x) => x.id === dragId.current,
-                                ),
-                                i,
-                              ),
-                            )
-                          }
-                        >
-                          <span className="lb-tree__meta">
-                            {String(i + 1).padStart(2, "0")}
-                          </span>
+                                      ))
+                                  : null}
+                              </div>
+                            ),
+                          )}
+                        </div>
+                        <div className="lb-section__head">
+                          {t("phases")}
                           <button
-                            className="lb-tree__label lb-tree-button"
-                            onClick={() =>
-                              s.select({ kind: "phase", id: p.id })
+                            className="lb-iconbtn"
+                            disabled={j.readOnly}
+                            aria-label={t("addPhase")}
+                            onClick={addPhase}
+                          >
+                            <Plus />
+                          </button>
+                        </div>
+                        {j.phases.map((p, i) => (
+                          <div
+                            className="lb-tree__row"
+                            key={p.id}
+                            draggable={!j.readOnly}
+                            onDragStart={() => {
+                              dragId.current = p.id;
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() =>
+                              s.editJourney((j) =>
+                                reorderPhase(
+                                  j,
+                                  j.phases.findIndex(
+                                    (x) => x.id === dragId.current,
+                                  ),
+                                  i,
+                                ),
+                              )
                             }
                           >
-                            {p.name}
-                          </button>
-                          <GripVertical size={12} />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="lb-section">
-                      <button
-                        className="lb-btn lb-btn--ghost"
-                        onClick={() => setDrawer("services")}
-                      >
-                        <Table2 size={15} />
-                        {t("viewData")}
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </aside>
+                            <span className="lb-tree__meta">
+                              {String(i + 1).padStart(2, "0")}
+                            </span>
+                            <button
+                              className="lb-tree__label lb-tree-button"
+                              onClick={() =>
+                                s.select({ kind: "phase", id: p.id })
+                              }
+                            >
+                              {p.name}
+                            </button>
+                            <GripVertical size={12} />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="lb-section">
+                        <button
+                          className="lb-btn lb-btn--ghost"
+                          onClick={() => {
+                            setDrawer("services");
+                            setView("data");
+                            setSheet(null);
+                          }}
+                        >
+                          <Table2 size={15} />
+                          {t("viewData")}
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </aside>
+              </ResponsivePanel>
             ) : null}
-            {j && !collapsed ? (
-              <Inspector
-                confirm={confirm}
-                ownerFilter={owner}
-                onOwnerFilter={setOwner}
-              />
+            {j && (!collapsed || sheet === "details") ? (
+              <ResponsivePanel
+                narrow={narrow || collapsed}
+                open={sheet === "details"}
+                title={t("editDetails")}
+                onClose={() => setSheet(null)}
+              >
+                <Inspector
+                  confirm={confirm}
+                  ownerFilter={owner}
+                  onOwnerFilter={setOwner}
+                />
+              </ResponsivePanel>
             ) : null}
           </>
         ) : null}
@@ -1912,11 +2028,12 @@ function EditorInner() {
                 >
                   {t("sketch")}
                 </button>
-                <button aria-pressed={false} onClick={startPresent}>
-                  {t("present")}
-                </button>
               </div>
             </Panel>
+          </>
+        ) : null}
+        {j && present === null && view === "canvas" ? (
+          <>
             <Panel position="bottom-left" className="lb-island lb-zoombar">
               <button
                 className="lb-tool"
@@ -2018,7 +2135,7 @@ function EditorInner() {
         ) : null}
       </ReactFlow>
       {j && view === "overview" && present === null ? (
-        <Overview onSelect={select} />
+        <Overview onSelect={select} onEdit={() => setDialog("setup")} />
       ) : null}
       {!j ? (
         <div className="lb-welcome">
@@ -2084,11 +2201,12 @@ function EditorInner() {
           </span>
         </div>
       ) : null}
-      {j && drawer && present === null && !collapsed && view === "canvas" ? (
+      {j && present === null && view === "data" ? (
         <Drawer
-          tab={drawer}
+          fullPage
+          tab={drawer || "steps"}
           setTab={setDrawer}
-          onClose={() => setDrawer(null)}
+          onClose={() => setView("canvas")}
           onSelect={select}
         />
       ) : null}
@@ -2123,6 +2241,20 @@ function EditorInner() {
             {j?.lanes.find((l) => l.id === picker.lane)?.name} ·{" "}
             {j?.phases.find((p) => p.id === picker.phase)?.name}
           </p>
+        </Modal>
+      ) : null}
+      {dialog === "setup" ? (
+        <JourneySetup key={j?.id} onClose={closeDialog} />
+      ) : null}
+      {dialog === "target" && j ? (
+        <Modal
+          title={t("comparison")}
+          onClose={() => {
+            if (targetState(j) === "not-started") s.setMode("now");
+            closeDialog();
+          }}
+        >
+          <TargetReview j={j} />
         </Modal>
       ) : null}
       {dialog === "import" ? (

@@ -8,6 +8,7 @@ import "@fontsource/geist-mono/400.css";
 import "@fontsource/caveat/400.css";
 import "./styles/laneboard.css";
 import Editor from "./Editor";
+import { exportJSON } from "./io/export";
 import { hydrate, useStore } from "./store";
 function App() {
   const ready = useStore((s) => s.ready);
@@ -30,9 +31,21 @@ class ErrorBoundary extends React.Component<
   render() {
     return this.state.error ? (
       <div className="lb-recovery">
-        <h1>Your workspace is safe on this device.</h1>
-        <p>Reload to reopen it.</p>
-        <pre>{this.state.error}</pre>
+        <h1>Laneboard could not display this workspace.</h1>
+        <p>
+          Export the current workspace before reloading. Reload restores the
+          last successfully saved version; recent unsaved edits may be missing.
+        </p>
+        <button
+          className="lb-btn lb-btn--primary"
+          onClick={() => exportJSON(true)}
+        >
+          Export recovery copy
+        </button>
+        <details>
+          <summary>Error details</summary>
+          <pre>{this.state.error}</pre>
+        </details>
         <button className="lb-btn" onClick={() => window.location.reload()}>
           Reload
         </button>

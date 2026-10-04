@@ -209,7 +209,7 @@ test("complete local-first journey flow with no external requests", async ({
     "Open journey: Small business owner starts investing",
   );
   await expect(page.getByTestId("kpi-restarts")).toHaveText("2");
-  await openPalette(page, "Create with AI");
+  await openPalette(page, "Prepare AI prompt");
   await page
     .getByLabel("Describe the scenario")
     .fill("An SME opens a savings account");

@@ -150,6 +150,10 @@ export function removeStructure(sel: Selection) {
       j.services.forEach((s) => {
         delete s.status.now[sel.id];
         delete s.status.target[sel.id];
+        if (s.placementLane === sel.id)
+          s.placementLane = j.lanes.find(
+            (l) => l.channel?.type === "digital",
+          )?.id;
       });
       j.presentation.forEach(
         (p) => (p.focusLanes = p.focusLanes.filter((id) => id !== sel.id)),

@@ -1,3 +1,5 @@
+import { EvidenceFields } from "../ui/Workflow";
+import { targetState, serviceStatus, flowAssessment } from "../model/analysis";
 import {
   X,
   Copy,
@@ -46,7 +48,8 @@ export function Inspector({
     mode = s.workspace.ui.mode;
   if (!j) return null;
   const edit = s.editJourney,
-    disabled = j.readOnly;
+    disabled =
+      j.readOnly || (mode === "target" && targetState(j) === "not-started");
   const entity =
     sel?.kind === "service"
       ? j.services.find((x) => x.id === sel.id)
@@ -76,6 +79,13 @@ export function Inspector({
         : "text" in entity
           ? entity.text
           : "");
+  const capabilityName = (id: string) =>
+    ({
+      webview: "Embedded web experience",
+      "context-sharing": "Shared customer context",
+      "deep-linking": "Direct links to tasks",
+      "session-handover": "Session handover",
+    })[id as "webview"] || id.replaceAll("-", " ");
   const title = sel
     ? sel.kind === "journey"
       ? j.title
@@ -197,6 +207,52 @@ export function Inspector({
             </div>
           </section>
           <section className="lb-inspector__section">
+            {(
+              [
+                "customer",
+                "situation",
+                "hypothesis",
+                "testPlan",
+                "nextAction",
+              ] as const
+            ).map((key) => (
+              <Field
+                key={key}
+                label={t(key)}
+                value={j[key]}
+                multiline
+                disabled={disabled}
+                onChange={(v) =>
+                  edit((j) => {
+                    j[key] = v;
+                  })
+                }
+              />
+            ))}
+            <Select
+              label={t("validationOwner")}
+              value={j.validationOwner || ""}
+              disabled={disabled}
+              onChange={(v) =>
+                edit((j) => {
+                  j.validationOwner = v || undefined;
+                })
+              }
+            >
+              <option value="">{t("none")}</option>
+              {s.workspace.owners.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </Select>
+            <EvidenceFields
+              item={j}
+              disabled={disabled}
+              onChange={(v) => edit((j) => Object.assign(j, v))}
+            />
+          </section>
+          <section className="lb-inspector__section">
             <span className="lb-inspector__label">{t("layers")}</span>
             <div className="lb-chips">
               {layers.map((l) => (
@@ -237,7 +293,10 @@ export function Inspector({
               {(
                 [
                   ["restarts", metric.restarts],
-                  ["coverage", `${metric.coverage}%`],
+                  [
+                    "coverage",
+                    metric.applicable ? `${metric.coverage}%` : t("unknown"),
+                  ],
                   ["serviceFriction", metric.servicesWithFriction],
                   ["frictions", metric.frictions],
                   ["channels", metric.channels],
@@ -377,15 +436,20 @@ export function Inspector({
               ))}
             </Select>
           ) : null}
-          {"assumption" in entity ? (
-            <Check
-              label={t("assumption")}
-              checked={entity.assumption}
+          {["lane", "service", "step", "friction"].includes(sel.kind) ? (
+            <EvidenceFields
+              item={
+                entity as {
+                  evidence?: "unknown" | "assumed" | "validated";
+                  evidenceNotes?: string;
+                  assumption?: boolean;
+                }
+              }
               disabled={disabled}
               onChange={(v) =>
                 edit((j) => {
                   const x = findEntity(j, sel);
-                  if (x && "assumption" in x) x.assumption = v;
+                  if (x) Object.assign(x, v);
                 })
               }
             />
@@ -396,16 +460,25 @@ export function Inspector({
                 const result = evaluateService(service, j, mode);
                 return (
                   <>
-                    <Check
-                      label={t("isolated")}
-                      checked={service.isolated}
+                    <Select
+                      label={t("flowAssessment")}
+                      value={flowAssessment(service)}
                       disabled={disabled || service.linksTo.length > 0}
                       onChange={(v) =>
                         edit((j) => {
-                          j.services.find((x) => x.id === sel.id)!.isolated = v;
+                          const x = j.services.find((x) => x.id === sel.id)!;
+                          x.flowAssessment = v as
+                            "unknown" | "isolated" | "connected";
+                          x.isolated = v === "isolated";
                         })
                       }
-                    />
+                    >
+                      {["unknown", "isolated", "connected"].map((v) => (
+                        <option key={v} value={v}>
+                          {t(v)}
+                        </option>
+                      ))}
+                    </Select>
                     <span className="lb-caps">{t("links")}</span>
                     {j.services
                       .filter((x) => x.id !== sel.id)
@@ -423,7 +496,10 @@ export function Inspector({
                               x.linksTo = v
                                 ? [...x.linksTo, other.id]
                                 : x.linksTo.filter((id) => id !== other.id);
-                              if (v) x.isolated = false;
+                              if (v) {
+                                x.isolated = false;
+                                x.flowAssessment = "connected";
+                              }
                             })
                           }
                         />
@@ -437,7 +513,7 @@ export function Inspector({
                         <Select
                           label={l.name}
                           key={l.id}
-                          value={service.status[mode][l.id] ?? "na"}
+                          value={serviceStatus(j, service, mode, l.id)}
                           disabled={disabled}
                           onChange={(v) =>
                             edit((j) => {
@@ -460,11 +536,10 @@ export function Inspector({
                     >
                       {t(result.severity)}
                     </span>
+                    <span className="lb-caps">{t("automaticChecks")}</span>
                     <ul className="lb-rule-list">
                       {result.notes.map((n, i) => (
-                        <li key={i}>
-                          <b>{n.rule}</b> {n.message}
-                        </li>
+                        <li key={i}>{n.message}</li>
                       ))}
                     </ul>
                     <span className="lb-caps">{t("capabilities")}</span>
@@ -472,7 +547,7 @@ export function Inspector({
                       {result.capabilities.map((c) => (
                         <span className="lb-tag" key={c}>
                           {s.workspace.capabilities.find((x) => x.id === c)
-                            ?.name || c}
+                            ?.name || capabilityName(c)}
                         </span>
                       ))}
                     </div>
@@ -529,7 +604,7 @@ export function Inspector({
                     </Select>
                     <Select
                       label={`${t("transition")} · ${t(mode)}`}
-                      value={step.transition[mode] || "channel-switch"}
+                      value={step.transition[mode] || "continue"}
                       disabled={disabled}
                       onChange={(v) =>
                         edit((j) => {
@@ -541,7 +616,7 @@ export function Inspector({
                     >
                       {transitions.map((v) => (
                         <option key={v} value={v}>
-                          {v}
+                          {t(v)}
                         </option>
                       ))}
                     </Select>
@@ -703,7 +778,7 @@ export function Inspector({
                         "market",
                       ].map((v) => (
                         <option key={v} value={v}>
-                          {v}
+                          {t(v)}
                         </option>
                       ))}
                     </Select>
@@ -744,7 +819,9 @@ export function Inspector({
                         "backstage",
                         "market",
                       ].map((v) => (
-                        <option key={v}>{v}</option>
+                        <option key={v} value={v}>
+                          {t(v)}
+                        </option>
                       ))}
                     </Select>
                     {l.kind === "channel" ? (
@@ -973,7 +1050,9 @@ export function Inspector({
                     >
                       {["note", "text", "rectangle", "ellipse", "arrow"].map(
                         (v) => (
-                          <option key={v}>{v}</option>
+                          <option key={v} value={v}>
+                            {t(v)}
+                          </option>
                         ),
                       )}
                     </Select>

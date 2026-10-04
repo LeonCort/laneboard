@@ -1,0 +1,384 @@
+{
+  "format": "laneboard",
+  "schemaVersion": 1,
+  "owners": [
+    {
+      "id": "owners-33e32bce",
+      "name": "Digital channels",
+      "description": "Owns the app assessment and saved application draft."
+    },
+    {
+      "id": "owners-166d85bc",
+      "name": "Business lending",
+      "description": "Owns adviser handoff and the lending decision."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "capabilities-43e4ffb1",
+      "name": "Shared application context",
+      "description": "Carry cash-flow assessment, draft, documents and consent between app and adviser."
+    }
+  ],
+  "journeys": [
+    {
+      "id": "journey-e77db880",
+      "title": "Freelancer secures a cash-flow buffer",
+      "segment": "Self-employed / small business",
+      "goal": "Cover a temporary cash shortfall without repeating information across channels.",
+      "description": "Fictional discovery hypothesis. Persona: a solo freelancer with a late invoice and bills due next week. If a cash-flow assessment, application draft and documents carry from mobile app to adviser, fewer customers will restart or abandon the application. Validate with interviews and a usability pilot. Service coverage, friction points and experience-curve values are assumptions, not observed bank capabilities or measured customer evidence.",
+      "baseline": "Unmeasured: establish completion, repeated fields and time-to-decision.",
+      "targetMetric": "Pilot hypothesis: +20 pp completion; 0 repeated fields; decision within 1 working day.",
+      "readOnly": false,
+      "phases": [
+        {
+          "id": "discover",
+          "name": "Spot the cash gap",
+          "width": 300
+        },
+        {
+          "id": "consider",
+          "name": "Choose support",
+          "width": 300
+        },
+        {
+          "id": "start",
+          "name": "Apply for a buffer",
+          "width": 300
+        },
+        {
+          "id": "use",
+          "name": "Manage repayment",
+          "width": 300
+        }
+      ],
+      "laneGroups": [
+        {
+          "id": "self",
+          "name": "Self-service",
+          "lineAfter": {
+            "kind": "boundary",
+            "label": "Self-service boundary"
+          }
+        },
+        {
+          "id": "assisted",
+          "name": "Assisted",
+          "lineAfter": {
+            "kind": "visibility",
+            "label": "Line of visibility"
+          }
+        },
+        {
+          "id": "backstage",
+          "name": "Backstage"
+        }
+      ],
+      "lanes": [
+        {
+          "id": "customer",
+          "group": null,
+          "kind": "customer",
+          "name": "Customer",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false
+        },
+        {
+          "id": "web",
+          "group": "self",
+          "kind": "channel",
+          "name": "Public website",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false,
+          "channel": {
+            "type": "digital",
+            "authenticated": false,
+            "webviewHost": false
+          }
+        },
+        {
+          "id": "app",
+          "group": "self",
+          "kind": "channel",
+          "name": "Mobile app",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false,
+          "channel": {
+            "type": "digital",
+            "authenticated": true,
+            "webviewHost": true
+          },
+          "owner": "owners-33e32bce"
+        },
+        {
+          "id": "netbank",
+          "group": "self",
+          "kind": "channel",
+          "name": "Internet bank",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false,
+          "channel": {
+            "type": "digital",
+            "authenticated": true,
+            "webviewHost": false
+          },
+          "owner": "owners-33e32bce"
+        },
+        {
+          "id": "support",
+          "group": "assisted",
+          "kind": "channel",
+          "name": "Customer service",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false,
+          "channel": {
+            "type": "assisted"
+          }
+        },
+        {
+          "id": "advisor",
+          "group": "assisted",
+          "kind": "channel",
+          "name": "Advisor",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false,
+          "channel": {
+            "type": "assisted"
+          },
+          "owner": "owners-166d85bc"
+        },
+        {
+          "id": "backstage",
+          "group": "backstage",
+          "kind": "backstage",
+          "name": "Enablers",
+          "sub": "",
+          "assumption": false,
+          "hidden": false,
+          "locked": false
+        }
+      ],
+      "cells": {
+        "customer": [
+          "A client invoice is late. Bills are due next week; check whether the balance will run out.",
+          "Compare total cost, eligibility and repayment risk before choosing a buffer.",
+          "Start an application in the app; an adviser asks for the same income and invoices again.",
+          "Receive a decision, draw the buffer and track repayment without missing bills."
+        ]
+      },
+      "services": [
+        {
+          "id": "service-690327bd",
+          "name": "Cash-flow assessment",
+          "description": "Estimate the next 30 days of cash inflows and bills. Current coverage is an assumption to investigate.",
+          "phase": "discover",
+          "isolated": false,
+          "linksTo": [],
+          "capabilities": [],
+          "status": {
+            "now": {
+              "web": "info",
+              "app": "native",
+              "netbank": "native"
+            },
+            "target": {
+              "web": "info",
+              "app": "native",
+              "netbank": "native"
+            }
+          }
+        },
+        {
+          "id": "service-4a72a64b",
+          "name": "Cash-buffer application",
+          "description": "Apply for a temporary lending buffer. Assumed current app webview loses the assessment when moving to an adviser.",
+          "phase": "start",
+          "isolated": false,
+          "linksTo": ["service-690327bd"],
+          "capabilities": ["capabilities-43e4ffb1"],
+          "status": {
+            "now": {
+              "web": "info",
+              "app": "webview",
+              "netbank": "native"
+            },
+            "target": {
+              "web": "info",
+              "app": "native",
+              "netbank": "native"
+            }
+          }
+        }
+      ],
+      "steps": [
+        {
+          "id": "step-c42be449",
+          "lane": "app",
+          "phase": "discover",
+          "text": "Check balance and upcoming bills",
+          "in": "both",
+          "transition": {
+            "now": "start",
+            "target": "start"
+          },
+          "notes": {
+            "now": "Assumption: customer checks the balance, then forecasts bills in a spreadsheet.",
+            "target": "Proposed: the forecast warns early and is saved with customer consent."
+          },
+          "textTarget": "See a cash-gap warning and save the assessment"
+        },
+        {
+          "id": "step-6fd12d7b",
+          "lane": "web",
+          "phase": "consider",
+          "text": "Compare cash-buffer cost and eligibility",
+          "in": "both",
+          "transition": {
+            "now": "channel-switch",
+            "target": "channel-switch"
+          },
+          "notes": {
+            "now": "Assumption: the website comparison does not know the app assessment.",
+            "target": "Proposed: comparisons reuse the assessment; confirm understanding of cost and risk."
+          },
+          "textTarget": "Compare options using the saved cash-flow assessment"
+        },
+        {
+          "id": "step-f5389eca",
+          "lane": "app",
+          "phase": "start",
+          "text": "Start the application and re-enter finances",
+          "in": "both",
+          "transition": {
+            "now": "restart",
+            "target": "channel-switch"
+          },
+          "notes": {
+            "now": "Assumption: a webview starts a new form and loses comparison context.",
+            "target": "Proposed: prefill the application. Pilot repeated fields and abandonment."
+          },
+          "textTarget": "Continue a prefilled application in the app"
+        },
+        {
+          "id": "step-5de6c9c9",
+          "lane": "advisor",
+          "phase": "start",
+          "text": "Adviser asks for income and invoices again",
+          "in": "both",
+          "transition": {
+            "now": "restart",
+            "target": "lead-to-advisor"
+          },
+          "notes": {
+            "now": "Assumption: adviser cannot see the app draft or documents. Second restart.",
+            "target": "Proposed: adviser reads the same draft and documents; customer fills only gaps."
+          },
+          "textTarget": "Adviser opens the same draft and verifies missing evidence"
+        },
+        {
+          "id": "step-6d53c1ce",
+          "lane": "netbank",
+          "phase": "use",
+          "text": "Read the lending decision and activate the buffer",
+          "in": "both",
+          "transition": {
+            "now": "back-to-digital",
+            "target": "back-to-digital"
+          },
+          "notes": {
+            "now": "Assumption: customer returns to internet banking after the adviser decision.",
+            "target": "Proposed: decision and repayment terms return to the saved digital journey."
+          },
+          "textTarget": "Receive a clear decision and repayment plan in the same journey"
+        },
+        {
+          "id": "step-20caf4bb",
+          "lane": "app",
+          "phase": "use",
+          "text": "Track the repayment dates in the app",
+          "in": "both",
+          "transition": {
+            "now": "channel-switch",
+            "target": "channel-switch"
+          },
+          "notes": {
+            "now": "Assumption: repayment information is available but separate from the cash forecast.",
+            "target": "Proposed: forecast refreshes after repayments; measure missed-bill risk."
+          },
+          "textTarget": "See repayment reminders and a refreshed cash forecast"
+        }
+      ],
+      "frictions": [
+        {
+          "id": "friction-f30ca85c",
+          "lane": "app",
+          "phase": "start",
+          "title": "Application restarts in an app webview",
+          "now": "Assumption: assessment and comparison inputs are not carried into the application. Verify in customer interviews.",
+          "recommendation": "Use a prefilled app application that preserves the assessment, documents and consent.",
+          "othersPattern": "",
+          "assumption": true,
+          "owner": "owners-33e32bce"
+        },
+        {
+          "id": "friction-8d6c0a26",
+          "lane": "advisor",
+          "phase": "start",
+          "title": "Adviser cannot see the saved application",
+          "now": "Assumption: customer repeats income and invoice details and uploads the same evidence a second time.",
+          "recommendation": "Let the adviser open the same draft, check only missing evidence and hand back a clear next step.",
+          "othersPattern": "",
+          "assumption": true,
+          "owner": "owners-166d85bc"
+        }
+      ],
+      "feeds": [],
+      "notes": [],
+      "sketches": [],
+      "experience": {
+        "now": [-1, -0.5, -1.8, 0.5],
+        "target": [-0.5, 0.5, 1, 1.5]
+      },
+      "presentation": []
+    }
+  ],
+  "settings": {
+    "name": "My workspace",
+    "theme": "system",
+    "language": "en",
+    "accent": "blue",
+    "logo": "",
+    "createdAt": "2026-10-04T06:11:20.939Z"
+  },
+  "ui": {
+    "selectedJourney": "journey-e77db880",
+    "mode": "now",
+    "layers": [
+      "services",
+      "journey",
+      "frictions",
+      "feeds",
+      "market",
+      "sketches"
+    ],
+    "collapsedGroups": [],
+    "viewport": {
+      "x": 617.8869047619048,
+      "y": 109,
+      "zoom": 0.7757936507936508
+    }
+  },
+  "exportedAt": "2026-10-04T06:21:56.831Z"
+}

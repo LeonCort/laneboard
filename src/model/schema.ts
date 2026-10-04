@@ -1,5 +1,6 @@
 import { z } from "zod";
 export const statuses = [
+  "unknown",
   "native",
   "webview",
   "info",
@@ -9,6 +10,7 @@ export const statuses = [
 ] as const;
 export const transitions = [
   "start",
+  "continue",
   "channel-switch",
   "restart",
   "to-support",
@@ -30,6 +32,11 @@ export const id = z
   .max(100)
   .regex(/^[a-zA-Z0-9-]+$/, "Use letters, digits and hyphens");
 const text = z.string().max(20000);
+export const evidenceStates = ["unknown", "assumed", "validated"] as const;
+const evidenceFields = {
+  evidence: z.enum(evidenceStates).optional(),
+  evidenceNotes: text.optional(),
+};
 export const definitionSchema = z.object({
   id,
   name: text,
@@ -48,6 +55,7 @@ export const groupSchema = z.object({
     .optional(),
 });
 export const laneSchema = z.object({
+  ...evidenceFields,
   id,
   group: id.nullable().default(null),
   kind: z.enum(["customer", "entry", "channel", "backstage", "market"]),
@@ -72,11 +80,14 @@ export const laneSchema = z.object({
     .optional(),
 });
 export const serviceSchema = z.object({
+  ...evidenceFields,
   id,
   name: text,
   description: text.default(""),
   phase: id,
   isolated: z.boolean().default(true),
+  flowAssessment: z.enum(["unknown", "isolated", "connected"]).optional(),
+  placementLane: id.optional(),
   linksTo: z.array(id).default([]),
   capabilities: z.array(id).default([]),
   status: z
@@ -87,6 +98,7 @@ export const serviceSchema = z.object({
     .default({ now: {}, target: {} }),
 });
 export const stepSchema = z.object({
+  ...evidenceFields,
   id,
   lane: id,
   phase: id,
@@ -104,6 +116,7 @@ export const stepSchema = z.object({
     .default({}),
 });
 export const frictionSchema = z.object({
+  ...evidenceFields,
   id,
   lane: id,
   phase: id,
@@ -155,6 +168,15 @@ export const journeySchema = z.object({
   segment: text.default(""),
   goal: text.default(""),
   description: text.default(""),
+  customer: text.default(""),
+  situation: text.default(""),
+  hypothesis: text.default(""),
+  testPlan: text.default(""),
+  nextAction: text.default(""),
+  validationOwner: id.optional(),
+  evidence: z.enum(evidenceStates).default("unknown"),
+  evidenceNotes: text.default(""),
+  targetState: z.enum(["not-started", "draft", "reviewed"]).optional(),
   baseline: text.default(""),
   targetMetric: text.default(""),
   readOnly: z.boolean().default(false),
@@ -218,6 +240,10 @@ export const fileSchema = z.object({
   journeys: z.array(journeySchema).max(100),
   settings: settingsSchema.optional(),
   ui: uiSchema.optional(),
+});
+export const workspaceSchema = fileSchema.extend({
+  settings: settingsSchema.default(() => settingsSchema.parse({})),
+  ui: uiSchema.default(() => uiSchema.parse({})),
 });
 export type Journey = z.infer<typeof journeySchema>;
 export type Lane = z.infer<typeof laneSchema>;

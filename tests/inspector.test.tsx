@@ -22,10 +22,10 @@ it("recomputes KPIs when now switches to target", () => {
   expect(screen.getByTestId("kpi-restarts")).toHaveTextContent("2");
   useStore.getState().setMode("target");
 });
-it("adding a link disables and clears the isolated checkbox", () => {
+it("adding a link disables and clears the flow connection", () => {
   useStore.getState().select({ kind: "service", id: "surplus-analysis" });
   render(<Inspector confirm={() => {}} />);
   fireEvent.click(screen.getByLabelText("Savings guide"));
-  expect(screen.getByLabelText("Isolated task")).toBeDisabled();
-  expect(screen.getByLabelText("Isolated task")).not.toBeChecked();
+  expect(screen.getByLabelText("Flow connection")).toBeDisabled();
+  expect(screen.getByLabelText("Flow connection")).toHaveValue("connected");
 });

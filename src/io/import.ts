@@ -111,15 +111,15 @@ export function parseImport(raw: string): {
               for (const l of lanes) {
                 const sm = s.status[mode] as Obj;
                 if (sm[String(l.id)] === undefined) {
-                  sm[String(l.id)] = "na";
+                  sm[String(l.id)] = "unknown";
                   warnings.push(
-                    `${p}services[${si}].status.${mode}.${l.id}: Defaulted to na.`,
+                    `${p}services[${si}].status.${mode}.${l.id}: Defaulted to unknown.`,
                   );
                 }
               }
             }
           else {
-            warnings.push(`${p}services[${si}].status: Defaulted to na.`);
+            warnings.push(`${p}services[${si}].status: Defaulted to unknown.`);
           }
         });
       if (Array.isArray(j.steps))
@@ -179,6 +179,7 @@ export function parseImport(raw: string): {
       if (v != null && !set.has(v))
         errors.push(`${path}: Reference “${v}” does not exist.`);
     };
+    ref(j.validationOwner, owners, `${p}.validationOwner`);
     j.lanes.forEach((l, i) => {
       ref(l.group, groups, `${p}.lanes[${i}].group`);
       ref(l.owner, owners, `${p}.lanes[${i}].owner`);
@@ -191,6 +192,7 @@ export function parseImport(raw: string): {
       j.lanes.filter((l) => l.channel?.type === "digital").map((l) => l.id),
     );
     j.services.forEach((s, i) => {
+      ref(s.placementLane, digital, `${p}.services[${i}].placementLane`);
       ref(s.phase, phases, `${p}.services[${i}].phase`);
       s.linksTo.forEach((v, k) =>
         ref(v, services, `${p}.services[${i}].linksTo[${k}]`),

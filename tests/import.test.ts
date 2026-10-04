@@ -68,7 +68,7 @@ describe("safe import", () => {
     delete x.journeys[0].services[0].status.now.app;
     const r = parseImport(JSON.stringify(x));
     expect(r.data.journeys[0].steps[0].in).toBe("both");
-    expect(r.data.journeys[0].services[0].status.now.app).toBe("na");
+    expect(r.data.journeys[0].services[0].status.now.app).toBe("unknown");
     expect(r.warnings.length).toBe(3);
   });
   it("ignores unknown fields with warnings", () => {

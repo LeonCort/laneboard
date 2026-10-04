@@ -23,6 +23,8 @@ import { exportJSON, exportCSV, exportImage, saveToDisk } from "../io/export";
 import { buildPrompt } from "../ai/prompt";
 import { newId, blankWorkspace, type FileData } from "../model/schema";
 export type DialogName =
+  | "setup"
+  | "target"
   | "import"
   | "export"
   | "ai"
