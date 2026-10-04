@@ -30,6 +30,8 @@ export const CellNode = memo(function CellNode({
     j = currentJourney(s),
     lane = j?.lanes.find((l) => l.id === data.lane);
   const { zoom } = useViewport();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const addRef = useRef<HTMLButtonElement>(null);
   const disabled =
     data.readOnly ||
     (s.workspace.ui.mode === "target" &&
@@ -45,16 +47,23 @@ export const CellNode = memo(function CellNode({
       style={{ width: data.width, height: data.height }}
     >
       {!disabled ? (
-        <Menu.Root>
+        <Menu.Root open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
           <Menu.Trigger asChild>
             <button
+              ref={addRef}
               className="lb-cell-add nodrag nopan"
               style={{
                 transform: `scale(${1 / zoom})`,
                 transformOrigin: "bottom right",
               }}
               aria-label={`${t("addInCell")} · ${lane?.name} · ${j?.phases.find((p) => p.id === data.phase)?.name}`}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (e.button === 0 && !e.ctrlKey) setMenuOpen(true);
+              }}
               onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
             >
               <Plus size={18} />
             </button>
@@ -64,6 +73,14 @@ export const CellNode = memo(function CellNode({
               className="lb-popover lb-cell-menu"
               sideOffset={4}
               onClick={(e) => e.stopPropagation()}
+              onPointerDownOutside={(e) => {
+                if (
+                  addRef.current?.contains(
+                    e.detail.originalEvent.target as globalThis.Node,
+                  )
+                )
+                  e.preventDefault();
+              }}
             >
               {(
                 [

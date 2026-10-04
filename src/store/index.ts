@@ -30,6 +30,7 @@ export type Selection = {
   id: string;
   lane?: string;
   phase?: string;
+  inline?: boolean;
 };
 interface State {
   workspace: Workspace;
@@ -137,7 +138,8 @@ export const useStore = create<State>()(
           } else if (data.journeys.length)
             w.ui.selectedJourney = w.journeys.at(-1)!.id;
         });
-        get().select(null);
+        const active = currentJourney(get());
+        get().select(active ? { kind: "journey", id: active.id } : null);
       },
       duplicateJourney: () => {
         get().edit((w) => {
@@ -150,7 +152,8 @@ export const useStore = create<State>()(
           w.journeys.push(copy);
           w.ui.selectedJourney = copy.id;
         });
-        get().select(null);
+        const active = currentJourney(get());
+        get().select(active ? { kind: "journey", id: active.id } : null);
       },
       newJourney: (template) => {
         const phases = [

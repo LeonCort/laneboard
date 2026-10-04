@@ -944,13 +944,6 @@ kbd,
   border-radius: var(--radius-pill);
 }
 
-/* Closed tools leave the navigation and its expand control available. */
-:root[data-ui="collapsed"] .lb-leftpanel,
-:root[data-ui="collapsed"] .lb-inspector,
-:root[data-ui="collapsed"] .lb-drawer {
-  display: none;
-}
-
 /* Presenting: everything but the canvas and the guide bar is hidden */
 :root[data-presenting="true"] .lb-island:not(.lb-guide) {
   display: none;

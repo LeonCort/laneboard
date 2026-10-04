@@ -174,7 +174,7 @@ test("narrow windows retain editing and clean mode retains zoom and details", as
     .selectOption("native");
   await clean(page);
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Collapse interface" }).click();
+  await page.getByRole("button", { name: "Collapse journey pane" }).click();
   await expect(
     page.getByRole("button", { name: "Zoom in", exact: true }),
   ).toBeVisible();
@@ -194,7 +194,7 @@ test("narrow windows retain editing and clean mode retains zoom and details", as
   await page.getByRole("button", { name: "Data", exact: true }).click();
   await expect(page.locator(".lb-data-page")).toBeVisible();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  await page.getByRole("button", { name: "Expand tools" }).click();
+  await page.getByRole("button", { name: "Expand journey pane" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
 });
 

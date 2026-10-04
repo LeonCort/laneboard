@@ -218,8 +218,9 @@ test("complete local-first journey flow with no external requests", async ({
     /SCHEMA[\s\S]*An SME|An SME[\s\S]*SCHEMA/,
   );
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await openPalette(page, "Collapse interface");
-  await expect(page.locator(".lb-dock")).not.toBeVisible();
+  await openPalette(page, "Collapse journey pane");
+  await expect(page.locator(".lb-leftpanel")).toHaveCount(0);
+  await expect(page.locator(".lb-dock")).toBeVisible();
   await page.keyboard.press("ControlOrMeta+\\");
   await expect(page.locator(".lb-dock")).toBeVisible();
   if (browserName === "chromium") {
@@ -228,6 +229,9 @@ test("complete local-first journey flow with no external requests", async ({
     });
     await context.setOffline(true);
     await page.reload();
+    await page
+      .getByRole("button", { name: "Edit journey", exact: true })
+      .click();
     await expect(page.getByTestId("kpi-restarts")).toHaveText("2");
     await context.setOffline(false);
   }

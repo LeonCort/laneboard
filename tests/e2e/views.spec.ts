@@ -7,7 +7,7 @@ async function openJourney(page: Page) {
   await expect(page.locator(".lb-sticky-phase")).toHaveCount(6);
 }
 
-test("navigation remains available when tools close and can reopen them", async ({
+test("journey pane collapses independently while navigation and selected details remain available", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1126, height: 780 });
@@ -16,24 +16,24 @@ test("navigation remains available when tools close and can reopen them", async 
     .locator(".react-flow__viewport")
     .getAttribute("style");
   const rail = page.getByRole("navigation", { name: "Workspace tools" });
-  await rail.getByRole("button", { name: "Collapse interface" }).click();
+  await rail.getByRole("button", { name: "Collapse journey pane" }).click();
   await expect(page.locator(".lb-leftpanel")).toHaveCount(0);
-  await expect(page.locator(".lb-inspector")).toHaveCount(0);
-  await expect(page.locator(".lb-dock")).toHaveCount(0);
+  await expect(page.locator(".lb-inspector")).toBeVisible();
+  await expect(page.locator(".lb-dock")).toBeVisible();
   for (const name of [
     "Journeys",
     "Library",
     "Definitions",
     "Prepare AI prompt",
     "Settings",
-    "Expand tools",
+    "Expand journey pane",
   ]) {
     await expect(rail.getByRole("button", { name, exact: true })).toBeVisible();
   }
   const railBox = await rail.boundingBox(),
     labels = await page.locator(".lb-lane-overlay").boundingBox();
   expect(labels!.x).toBeGreaterThan(railBox!.x + railBox!.width);
-  await rail.getByRole("button", { name: "Expand tools" }).click();
+  await rail.getByRole("button", { name: "Expand journey pane" }).click();
   await expect(page.locator(".lb-leftpanel")).toBeVisible();
   await expect(page.locator(".lb-inspector")).toBeVisible();
   await expect(page.locator(".lb-dock")).toBeVisible();
@@ -44,7 +44,7 @@ test("navigation remains available when tools close and can reopen them", async 
   await page.keyboard.press("ControlOrMeta+\\");
   await rail.getByRole("button", { name: "Library", exact: true }).click();
   await expect(page.locator(".lb-leftpanel .lb-library-grid")).toBeVisible();
-  await rail.getByRole("button", { name: "Collapse interface" }).click();
+  await rail.getByRole("button", { name: "Collapse journey pane" }).click();
   await rail.getByRole("button", { name: "Definitions", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Definitions" })).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();

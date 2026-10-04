@@ -159,7 +159,7 @@ function EditorInner() {
     [tool, setTool] = useState("select"),
     [editorMode, setEditorMode] = useState<"map" | "sketch">("map"),
     [keepTool, setKeepTool] = useState(false),
-    [collapsed, setCollapsed] = useState(false),
+    [leftCollapsed, setLeftCollapsed] = useState(false),
     [toast, setToast] = useState(""),
     [present, setPresent] = useState<number | null>(null),
     [picker, setPicker] = useState<{ lane: string; phase: string } | null>(
@@ -178,6 +178,11 @@ function EditorInner() {
   const [sheet, setSheet] = useState<"tools" | "details" | null>(null);
   const seenJourneys = useRef(new Set(s.workspace.journeys.map((j) => j.id)));
   const narrow = canvasSize.width <= 960;
+  const newJourneyPending =
+    !!j &&
+    !seenJourneys.current.has(j.id) &&
+    j.title === "Untitled journey" &&
+    targetState(j) === "not-started";
   useEffect(() => {
     if (
       j &&
@@ -187,31 +192,22 @@ function EditorInner() {
       setDialog("target");
   }, [j, s.workspace.ui.mode]);
   useEffect(() => {
-    if (
-      j &&
-      !seenJourneys.current.has(j.id) &&
-      j.title === "Untitled journey" &&
-      targetState(j) === "not-started"
-    )
-      setDialog("setup");
+    if (newJourneyPending) setDialog("setup");
     seenJourneys.current = new Set(s.workspace.journeys.map((j) => j.id));
-  }, [j, s.workspace.journeys]);
-  const selectionId = s.selection?.id,
-    selectionKind = s.selection?.kind;
-  const previousDetailSelection = useRef(selectionId);
+  }, [j, newJourneyPending, s.workspace.journeys]);
+  const previousDetailSelection = useRef(s.selection);
   useEffect(() => {
-    if (
-      (narrow || collapsed) &&
-      selectionId &&
-      previousDetailSelection.current !== selectionId &&
-      selectionKind &&
-      ["service", "step", "friction", "feed", "note", "sketch"].includes(
-        selectionKind,
-      )
+    if (!s.selection) setSheet((value) => (value === "details" ? null : value));
+    else if (
+      narrow &&
+      !dialog &&
+      !newJourneyPending &&
+      previousDetailSelection.current !== s.selection &&
+      !s.selection.inline
     )
       setSheet("details");
-    previousDetailSelection.current = selectionId;
-  }, [narrow, collapsed, selectionId, selectionKind]);
+    previousDetailSelection.current = s.selection;
+  }, [narrow, dialog, newJourneyPending, s.selection]);
   const [nodes, setNodes] = useState<Node[]>([]),
     dragId = useRef(""),
     toastTimer = useRef<ReturnType<typeof setTimeout>>(),
@@ -230,9 +226,13 @@ function EditorInner() {
     searchTriggerRef.current?.focus();
   };
   const leftX =
-      present !== null ? 16 : collapsed || canvasSize.width <= 960 ? 84 : 340,
+      present !== null
+        ? 16
+        : leftCollapsed || canvasSize.width <= 960
+          ? 84
+          : 340,
     rightInset =
-      present !== null || collapsed || canvasSize.width <= 960 ? 16 : 304,
+      present !== null || !s.selection || canvasSize.width <= 960 ? 16 : 304,
     labelWidth = 132,
     phaseTop = present !== null ? 16 : canvasSize.width <= 520 ? 108 : 60,
     laneTop = phaseTop + 40,
@@ -295,8 +295,10 @@ function EditorInner() {
     setNodes(graph?.nodes || []);
   }, [graph]);
   useEffect(() => {
-    document.documentElement.dataset.ui = collapsed ? "collapsed" : "expanded";
-  }, [collapsed]);
+    document.documentElement.dataset.sidebar = leftCollapsed
+      ? "collapsed"
+      : "expanded";
+  }, [leftCollapsed]);
   useEffect(() => {
     document.documentElement.dataset.presenting =
       present !== null ? "true" : "false";
@@ -342,7 +344,8 @@ function EditorInner() {
         delete ui.viewport;
       });
     else s.importData(exampleFile(kind), false);
-    s.select(null);
+    const selected = currentJourney(useStore.getState());
+    s.select(selected ? { kind: "journey", id: selected.id } : null);
   };
   const closeDialog = () => {
     setDialog(null);
@@ -505,10 +508,7 @@ function EditorInner() {
     const fitted = getViewportForBounds(
       getNodesBounds(cells),
       Math.max(100, canvasSize.width - columnLeft - rightInset),
-      Math.max(
-        100,
-        canvasSize.height - laneTop - (narrow && !collapsed ? 154 : 94),
-      ),
+      Math.max(100, canvasSize.height - laneTop - (narrow ? 154 : 94)),
       0.1,
       1,
       0.04,
@@ -671,8 +671,8 @@ function EditorInner() {
     },
     {
       id: "ui",
-      label: t(collapsed ? "expandUI" : "toggleUI"),
-      run: () => setCollapsed((v) => !v),
+      label: t(leftCollapsed ? "expandUI" : "toggleUI"),
+      run: () => setLeftCollapsed((v) => !v),
       shortcut: "⌘ \\",
     },
     { id: "present", label: t("present"), run: startPresent },
@@ -759,11 +759,14 @@ function EditorInner() {
     ...s.workspace.journeys.map((j) => ({
       id: `journey-${j.id}`,
       label: `Open journey: ${j.title}`,
-      run: () =>
+      run: () => {
+        setView("canvas");
         setUI((ui) => {
           ui.selectedJourney = j.id;
           delete ui.viewport;
-        }),
+        });
+        s.select({ kind: "journey", id: j.id });
+      },
     })),
     ...(["services", "frictions", "capabilities", "steps"] as const).map(
       (v) => ({
@@ -854,7 +857,7 @@ function EditorInner() {
     if (!row) return;
     const current = flow.getViewport(),
       top = laneTop + 8,
-      bottom = canvasSize.height - (collapsed ? 24 : 72);
+      bottom = canvasSize.height - 72;
     const rowTop = current.y + row.y * current.zoom,
       rowBottom = rowTop + row.height * current.zoom;
     const y =
@@ -885,7 +888,7 @@ function EditorInner() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
         e.preventDefault();
-        setCollapsed((v) => !v);
+        setLeftCollapsed((v) => !v);
         return;
       }
       const active = document.activeElement;
@@ -944,7 +947,7 @@ function EditorInner() {
         }
         if (k === "\\") {
           e.preventDefault();
-          setCollapsed((v) => !v);
+          setLeftCollapsed((v) => !v);
         }
         return;
       }
@@ -1080,7 +1083,7 @@ function EditorInner() {
                 phase: c.phase,
               });
           } else if (node.type === "card") {
-            if (narrow || collapsed) setSheet("details");
+            if (narrow) setSheet("details");
             const c = node.data as CardData;
             s.select({
               kind: c.kind,
@@ -1194,8 +1197,7 @@ function EditorInner() {
                 left: leftX,
                 width: labelWidth,
                 top: laneTop,
-                bottom:
-                  present !== null ? guideHeight + 24 : collapsed ? 16 : 64,
+                bottom: present !== null ? guideHeight + 24 : 64,
               }}
             >
               {graph.rows.map((row) => (
@@ -1288,7 +1290,7 @@ function EditorInner() {
                 onClick={() => {
                   setView("canvas");
                   s.select({ kind: "journey", id: j.id });
-                  if (narrow || collapsed) setSheet("details");
+                  if (narrow) setSheet("details");
                 }}
               >
                 <span className="lb-filepill__context">
@@ -1338,8 +1340,8 @@ function EditorInner() {
                     { label: t("backup"), run: () => exportJSON(true) },
                     { label: t("settings"), run: () => setDialog("settings") },
                     {
-                      label: t(collapsed ? "expandUI" : "toggleUI"),
-                      run: () => setCollapsed((v) => !v),
+                      label: t(leftCollapsed ? "expandUI" : "toggleUI"),
+                      run: () => setLeftCollapsed((v) => !v),
                     },
                   ].map((a) => (
                     <Menu.Item
@@ -1537,14 +1539,14 @@ function EditorInner() {
             className="lb-island lb-canvas-actions"
             style={{ left: leftX, top: phaseTop }}
           >
-            <AddLaneButton key={j.id} journey={j} reveal={revealLane} />
+            <AddLaneButton journey={j} reveal={revealLane} />
             <HiddenLanesControl journey={j} reveal={revealLane} />
             <button
               className="lb-iconbtn"
               aria-label={t("editDetails")}
               onClick={() => {
                 if (!s.selection) s.select({ kind: "journey", id: j.id });
-                if (narrow || collapsed) setSheet("details");
+                if (narrow) setSheet("details");
               }}
             >
               {<SlidersHorizontal size={16} />}
@@ -1564,7 +1566,7 @@ function EditorInner() {
                   icon: Layers,
                   run: () => {
                     setRail("journeys");
-                    setCollapsed(false);
+                    setLeftCollapsed(false);
                     if (narrow) setSheet("tools");
                   },
                 },
@@ -1574,7 +1576,7 @@ function EditorInner() {
                   icon: Library,
                   run: () => {
                     setRail("library");
-                    setCollapsed(false);
+                    setLeftCollapsed(false);
                     if (narrow) setSheet("tools");
                   },
                 },
@@ -1600,7 +1602,7 @@ function EditorInner() {
                 <button
                   className="lb-rail__btn"
                   key={a.id}
-                  aria-pressed={!collapsed && rail === a.id}
+                  aria-pressed={!leftCollapsed && rail === a.id}
                   aria-label={t(a.key as Key)}
                   onClick={a.run}
                 >
@@ -1611,18 +1613,18 @@ function EditorInner() {
               <div className="lb-rail__sep" />
               <button
                 className="lb-rail__btn"
-                aria-label={t(collapsed ? "expandUI" : "toggleUI")}
-                aria-expanded={!collapsed}
+                aria-label={t(leftCollapsed ? "expandUI" : "toggleUI")}
+                aria-expanded={!leftCollapsed}
                 onClick={() => {
-                  setCollapsed((value) => !value);
-                  if (narrow && collapsed) setSheet("tools");
+                  setLeftCollapsed((value) => !value);
+                  if (narrow && leftCollapsed) setSheet("tools");
                 }}
               >
-                {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-                {t(collapsed ? "expand" : "close")}
+                {leftCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+                {t(leftCollapsed ? "expand" : "close")}
               </button>
             </nav>
-            {j && !collapsed ? (
+            {j && !leftCollapsed ? (
               <ResponsivePanel
                 narrow={narrow}
                 open={sheet === "tools"}
@@ -1734,7 +1736,8 @@ function EditorInner() {
                                     ui.selectedJourney = x.id;
                                     delete ui.viewport;
                                   });
-                                  s.select(null);
+                                  s.select({ kind: "journey", id: x.id });
+                                  if (narrow) setSheet("details");
                                 }}
                               >
                                 {x.title}
@@ -2026,9 +2029,9 @@ function EditorInner() {
                 </aside>
               </ResponsivePanel>
             ) : null}
-            {j && (!collapsed || sheet === "details") ? (
+            {j && s.selection ? (
               <ResponsivePanel
-                narrow={narrow || collapsed}
+                narrow={narrow}
                 open={sheet === "details"}
                 title={t("editDetails")}
                 onClose={() => setSheet(null)}
@@ -2042,7 +2045,7 @@ function EditorInner() {
             ) : null}
           </>
         ) : null}
-        {j && present === null && !collapsed && view === "canvas" ? (
+        {j && present === null && view === "canvas" ? (
           <>
             <Panel position="bottom-center" className="lb-island lb-dock">
               {(editorMode === "map" ? toolSpec : sketchSpec).map((a) => (

@@ -224,6 +224,7 @@
   bottom: var(--space-2);
   left: var(--space-2);
   right: var(--space-2);
+  pointer-events: none;
 }
 .lb-handle {
   opacity: 0;
@@ -579,10 +580,6 @@
   box-shadow: none;
   border: 0;
   width: 100%;
-}
-:root[data-ui="collapsed"] .lb-dock,
-:root[data-ui="collapsed"] .lb-zoombar {
-  display: none;
 }
 :root[data-presenting="true"] .lb-phase-overlay,
 :root[data-presenting="true"] .lb-lane-overlay {
@@ -1123,6 +1120,8 @@
 }
 .lb-cell-add {
   position: absolute;
+  z-index: 1;
+  pointer-events: none;
   bottom: 4px;
   right: 4px;
   width: 36px;
@@ -1140,6 +1139,7 @@
 .lb-cell:focus-within .lb-cell-add,
 .lb-cell-add[data-state="open"] {
   opacity: 1;
+  pointer-events: auto;
 }
 .lb-editor[data-present="true"] .lb-cell-add {
   display: none;
@@ -1265,23 +1265,11 @@
     height: 18px;
   }
 }
-:root[data-ui="collapsed"] .lb-zoombar {
-  display: flex;
-}
 @media (max-width: 960px) {
   .lb-zoombar {
     display: flex;
     bottom: 76px;
   }
-  :root[data-ui="collapsed"] .lb-zoombar {
-    bottom: var(--space-2);
-  }
-}
-:root[data-ui="collapsed"] .lb-tools-sheet .lb-inspector {
-  display: block;
-}
-:root[data-ui="collapsed"] .lb-data-page {
-  display: flex;
 }
 
 @media (max-width: 720px) {

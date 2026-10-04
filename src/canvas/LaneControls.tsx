@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Eye, EyeOff, Pencil, Plus, X } from "lucide-react";
@@ -29,12 +29,14 @@ function LaneForm({
   group,
   close,
   reveal,
+  onDuplicate,
 }: {
   journey: Journey;
   lane?: Lane;
   group: string | null;
   close: () => void;
   reveal?: (id: string) => void;
+  onDuplicate?: () => void;
 }) {
   const t = useT(),
     titleId = useId();
@@ -84,6 +86,8 @@ function LaneForm({
                     ? { type: "assisted" }
                     : undefined,
             });
+          if (!lane && id)
+            useStore.getState().select({ kind: "lane", id, inline: true });
           close();
           if (id) reveal?.(id);
         }}
@@ -105,8 +109,17 @@ function LaneForm({
               type="button"
               className="lb-btn lb-btn--primary"
               onClick={() => {
-                close();
-                useStore.getState().duplicateJourney();
+                if (onDuplicate) {
+                  onDuplicate();
+                  requestAnimationFrame(() =>
+                    formRef.current
+                      ?.querySelector<HTMLInputElement>("input")
+                      ?.focus(),
+                  );
+                } else {
+                  close();
+                  useStore.getState().duplicateJourney();
+                }
               }}
             >
               {t("duplicate")}
@@ -218,7 +231,9 @@ export function LaneLabel({
         title={`${t("editLane")} ${lane.name}`}
         data-selected={open}
         onClick={() =>
-          useStore.getState().select({ kind: "lane", id: lane.id })
+          useStore
+            .getState()
+            .select({ kind: "lane", id: lane.id, inline: true })
         }
       >
         {lane.name}
@@ -250,15 +265,28 @@ export function AddLaneButton({
 }) {
   const t = useT(),
     [open, setOpen] = useState(false);
+  const previousJourney = useRef(journey.id);
+  useEffect(() => {
+    if (previousJourney.current !== journey.id) {
+      previousJourney.current = journey.id;
+      setOpen(false);
+    }
+  }, [journey.id]);
   const groupName = journey.laneGroups.find((g) => g.id === group)?.name;
   const label = groupName ? `${t("addLaneTo")} ${groupName}` : t("addLane");
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
-        className={compact ? "lb-inline-add" : "lb-iconbtn"}
+        className={`${compact ? "lb-inline-add" : "lb-iconbtn"} nodrag nopan`}
         aria-label={label}
         title={label}
-        disabled={journey.readOnly || journey.lanes.length >= 100}
+        disabled={journey.lanes.length >= 100}
+        onPointerDown={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.detail > 1) e.preventDefault();
+        }}
       >
         <Plus size={14} />
       </Popover.Trigger>
@@ -268,6 +296,12 @@ export function AddLaneButton({
           group={group}
           close={() => setOpen(false)}
           reveal={reveal}
+          onDuplicate={() => {
+            const store = useStore.getState();
+            store.duplicateJourney();
+            previousJourney.current =
+              useStore.getState().workspace.ui.selectedJourney || journey.id;
+          }}
         />
       </Popover.Portal>
     </Popover.Root>

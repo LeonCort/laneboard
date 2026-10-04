@@ -10,7 +10,7 @@ async function blankBank(page: Page, width = 1440) {
   await page.getByRole("button", { name: "Skip setup", exact: true }).click();
   await expect(page.locator(".lb-sticky-phase")).toHaveCount(4);
   await page
-    .getByRole("button", { name: "Collapse interface", exact: true })
+    .getByRole("button", { name: "Collapse journey pane", exact: true })
     .click();
 }
 
@@ -37,7 +37,7 @@ test("inline lane editing, grouping, hiding and adding work with tools closed", 
   });
   await expect(label).toBeVisible();
   await expect(page.locator(".lb-leftpanel")).toHaveCount(0);
-  await expect(page.locator(".lb-inspector")).toHaveCount(0);
+  await expect(page.locator(".lb-inspector")).toBeVisible();
   await label.click();
   await expect(editor.getByLabel("Lane group")).toHaveValue("assisted");
   await expect(editor.getByLabel("Subtitle")).toHaveValue("Banking on the go");
@@ -93,7 +93,7 @@ test("inline lane editing, grouping, hiding and adding work with tools closed", 
   expect(accessibility.violations).toEqual([]);
   await page.reload();
   await page
-    .getByRole("button", { name: "Collapse interface", exact: true })
+    .getByRole("button", { name: "Collapse journey pane", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Edit lane Video advice", exact: true }),
@@ -178,7 +178,7 @@ test("inline editing protects examples and offers a duplicate before editing", a
   await page.goto("/");
   await page.getByRole("button", { name: "Open investing example" }).click();
   await page
-    .getByRole("button", { name: "Collapse interface", exact: true })
+    .getByRole("button", { name: "Collapse journey pane", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Edit lane Customer", exact: true })
