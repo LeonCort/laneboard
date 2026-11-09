@@ -28,6 +28,7 @@ import {
 } from "@xyflow/react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
+  FileText,
   Layers,
   Library,
   SlidersHorizontal,
@@ -121,6 +122,14 @@ import { presentationFor } from "./present";
 import { layers, newId, type Layer } from "./model/schema";
 import { exportJSON, exportImage, exportCSV } from "./io/export";
 import {
+  useFile,
+  openFile,
+  saveFile,
+  saveFileAs,
+  newLaneboard,
+  canSaveInPlace,
+} from "./io/file";
+import {
   Modal,
   ImportDialog,
   ExportDialog,
@@ -194,6 +203,8 @@ function EditorInner() {
     [confirmAction, setConfirmAction] = useState<{
       title: string;
       run: () => void;
+      description?: string;
+      confirmLabel?: string;
     } | null>(null),
     [space, setSpace] = useState(false);
   const [sheet, setSheet] = useState<"tools" | "details" | null>(null);
@@ -294,10 +305,77 @@ function EditorInner() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 3500);
   }, []);
-  const confirm = useCallback((title: string, run: () => void) => {
-    setConfirmAction({ title, run });
-    setDialog("confirm");
-  }, []);
+  const confirm = useCallback(
+    (
+      title: string,
+      run: () => void,
+      options?: { description?: string; confirmLabel?: string },
+    ) => {
+      setConfirmAction({ title, run, ...options });
+      setDialog("confirm");
+    },
+    [],
+  );
+  const file = useFile();
+  useEffect(() => {
+    document.title = file.name
+      ? `${file.dirty ? "• " : ""}${file.name} — Laneboard`
+      : "Laneboard — your channels, one journey";
+  }, [file.name, file.dirty]);
+  const fileError = useCallback(
+    (e: unknown) => {
+      if ((e as Error)?.name !== "AbortError") notify((e as Error).message);
+    },
+    [notify],
+  );
+  // Opening a file or starting a new Laneboard replaces the workspace. Ask
+  // first when that would lose work that is not in a file.
+  const replaceWorkspace = useCallback(
+    (run: () => void) => {
+      const f = useFile.getState(),
+        w = useStore.getState().workspace;
+      const unsaved = f.name ? f.dirty : w.journeys.some((x) => !x.readOnly);
+      if (unsaved)
+        confirm(t("replaceTitle"), run, {
+          description: t("replaceUnsaved"),
+          confirmLabel: t("replaceConfirm"),
+        });
+      else run();
+    },
+    [confirm, t],
+  );
+  const openLaneboard = useCallback(
+    () =>
+      replaceWorkspace(() => {
+        setView("canvas");
+        void openFile()
+          .then((r) => r && notify(`${t("fileOpened")} ${r.name}`))
+          .catch(fileError);
+      }),
+    [replaceWorkspace, notify, fileError, t],
+  );
+  const save = useCallback(
+    (as = false) => {
+      void (as ? saveFileAs() : saveFile())
+        .then((name) =>
+          notify(
+            canSaveInPlace()
+              ? `${t("fileSavedAs")} ${name}`
+              : `${t("downloadedCopy")} ${name}`,
+          ),
+        )
+        .catch(fileError);
+    },
+    [notify, fileError, t],
+  );
+  const startNewLaneboard = useCallback(
+    () =>
+      replaceWorkspace(() => {
+        setView("canvas");
+        newLaneboard();
+      }),
+    [replaceWorkspace],
+  );
   const sequence = useMemo(() => (j ? presentationFor(j) : []), [j]),
     slide = present !== null ? sequence[present] : undefined;
   const effectiveUI = useMemo(
@@ -692,6 +770,25 @@ function EditorInner() {
     );
   };
   const actions: Action[] = [
+    {
+      id: "open-file",
+      label: t("openFile"),
+      shortcut: "Ctrl O",
+      run: openLaneboard,
+    },
+    {
+      id: "save-file",
+      label: t("saveFile"),
+      shortcut: "Ctrl S",
+      run: () => save(),
+    },
+    {
+      id: "save-file-as",
+      label: t("saveFileAs"),
+      shortcut: "Ctrl Shift S",
+      run: () => save(true),
+    },
+    { id: "new-laneboard", label: t("newLaneboard"), run: startNewLaneboard },
     { id: "new", label: t("newJourney"), run: () => setDialog("new") },
     { id: "duplicate-journey", label: t("duplicate"), run: s.duplicateJourney },
     { id: "import", label: t("import"), run: () => setDialog("import") },
@@ -1285,6 +1382,16 @@ function EditorInner() {
         setDialog("palette");
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === "s" || key === "o") {
+          e.preventDefault();
+          if (dialog || present !== null) return;
+          if (key === "o") openLaneboard();
+          else save(e.shiftKey);
+          return;
+        }
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
         e.preventDefault();
         setLeftCollapsed((v) => !v);
@@ -1853,6 +1960,22 @@ function EditorInner() {
                     : "saveError",
               )}
             </span>
+            {file.name ? (
+              <button
+                type="button"
+                className="lb-filestate"
+                data-dirty={file.dirty}
+                onClick={() => save()}
+                title={`${file.name} · ${t(file.dirty ? "unsavedChanges" : "savedToFile")} · ${t("saveFile")} (Ctrl+S)`}
+                aria-label={`${file.name}, ${t(file.dirty ? "unsavedChanges" : "savedToFile")}. ${t("saveFile")}`}
+                data-testid="file-state"
+              >
+                <FileText size={14} aria-hidden />
+                <span className="lb-filestate__name">
+                  {file.name.replace(/\.laneboard\.json$|\.json$/, "")}
+                </span>
+              </button>
+            ) : null}
             <Menu.Root>
               <Menu.Trigger
                 className="lb-iconbtn"
@@ -1863,6 +1986,10 @@ function EditorInner() {
               <Menu.Portal>
                 <Menu.Content className="lb-popover lb-menu" sideOffset={8}>
                   {[
+                    { label: t("openFile"), run: openLaneboard },
+                    { label: t("saveFile"), run: () => save() },
+                    { label: t("saveFileAs"), run: () => save(true) },
+                    { label: t("newLaneboard"), run: startNewLaneboard },
                     { label: t("newJourney"), run: () => setDialog("new") },
                     { label: t("import"), run: () => setDialog("import") },
                     {
@@ -2770,6 +2897,11 @@ function EditorInner() {
                 <Plus size={18} />
                 {t("startBank")}
               </button>
+              <button className="lb-welcome__item" onClick={openLaneboard}>
+                <FileText size={18} />
+                {t("openFile")}
+                <span className="lb-menu__shortcut">Ctrl O</span>
+              </button>
               <button
                 className="lb-welcome__item"
                 onClick={() => setDialog("import")}
@@ -2887,6 +3019,8 @@ function EditorInner() {
       {dialog === "confirm" && confirmAction ? (
         <ConfirmDialog
           title={confirmAction.title}
+          description={confirmAction.description}
+          confirmLabel={confirmAction.confirmLabel}
           onClose={closeDialog}
           onConfirm={confirmAction.run}
         />

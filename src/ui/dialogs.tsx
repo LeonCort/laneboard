@@ -19,7 +19,8 @@ import { useT } from "../i18n";
 import { useStore, currentJourney } from "../store";
 import { Field, Select } from "./fields";
 import { parseImport, MAX_IMPORT_SIZE } from "../io/import";
-import { exportJSON, exportCSV, exportImage, saveToDisk } from "../io/export";
+import { exportJSON, exportCSV, exportImage } from "../io/export";
+import { saveFileAs } from "../io/file";
 import { buildPrompt } from "../ai/prompt";
 import { newId, blankWorkspace, type FileData } from "../model/schema";
 export type DialogName =
@@ -326,7 +327,7 @@ export function ExportDialog({
       <button
         className="lb-btn"
         onClick={() =>
-          void saveToDisk().catch((e) => {
+          void saveFileAs().catch((e) => {
             if (e.name !== "AbortError") notify(e.message);
           })
         }
@@ -658,14 +659,22 @@ export function ConfirmDialog({
   onClose,
   onConfirm,
   title,
+  description,
+  confirmLabel,
 }: {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
+  description?: string;
+  confirmLabel?: string;
 }) {
   const t = useT();
   return (
-    <Modal title={title} description={t("confirmDelete")} onClose={onClose}>
+    <Modal
+      title={title}
+      description={description ?? t("confirmDelete")}
+      onClose={onClose}
+    >
       <div className="lb-dialog-actions">
         <button className="lb-btn" onClick={onClose}>
           {t("cancel")}
@@ -677,7 +686,7 @@ export function ConfirmDialog({
             onClose();
           }}
         >
-          {t("delete")}
+          {confirmLabel ?? t("delete")}
         </button>
       </div>
     </Modal>
