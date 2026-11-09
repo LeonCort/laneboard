@@ -1,11 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@xyflow/react/dist/style.css";
-import "@fontsource/geist/400.css";
-import "@fontsource/geist/500.css";
-import "@fontsource/geist/600.css";
-import "@fontsource/geist-mono/400.css";
-import "@fontsource/caveat/400.css";
+import "@fontsource/geist/latin-400.css";
+import "@fontsource/geist/latin-500.css";
+import "@fontsource/geist/latin-600.css";
+import "@fontsource/geist-mono/latin-400.css";
+import "@fontsource/caveat/latin-400.css";
 import "./styles/laneboard.css";
 import Editor from "./Editor";
 import { exportJSON } from "./io/export";
@@ -61,8 +61,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </ErrorBoundary>,
 );
 void hydrate();
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js").catch(() => {});
-  });
+// The same single HTML file runs from a web host and from disk (file://). Only a
+// web origin can install the offline worker and the app manifest.
+if (import.meta.env.PROD && /^https?:$/.test(location.protocol)) {
+  const manifest = document.createElement("link");
+  manifest.rel = "manifest";
+  manifest.href = "manifest.webmanifest";
+  document.head.append(manifest);
+  if ("serviceWorker" in navigator)
+    window.addEventListener("load", () => {
+      void navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
 }
