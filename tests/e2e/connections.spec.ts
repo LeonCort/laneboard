@@ -35,17 +35,22 @@ async function openLinks(page: Page, id: string) {
 }
 async function dragLink(page: Page, from: string, to: string, valid = true) {
   await card(page, from).hover();
-  const plus = await card(page, from)
-      .getByRole("button", { name: /^Add link from/ })
-      .boundingBox(),
+  const button = card(page, from).getByRole("button", {
+    name: /^Add link from/,
+  });
+  // The plus appears on hover; measure it only once it is shown, so the press
+  // lands on the handle on slower machines too.
+  await expect(button).toBeVisible();
+  const plus = await button.boundingBox(),
     target = await card(page, to).boundingBox();
   expect(plus).not.toBeNull();
   expect(target).not.toBeNull();
   await page.mouse.move(plus!.x + plus!.width / 2, plus!.y + plus!.height / 2);
   await page.mouse.down();
   await page.mouse.move(
-    plus!.x + plus!.width / 2 + 5,
+    plus!.x + plus!.width / 2 + 8,
     plus!.y + plus!.height / 2,
+    { steps: 4 },
   );
   await expect(card(page, to).locator(".lb-card")).toHaveAttribute(
     "data-link-target",
@@ -174,6 +179,11 @@ test("feed search works in a smaller window without opening a second pane", asyn
   await picker(page)
     .getByRole("combobox", { name: "Find a connection" })
     .fill("Open an account");
+  // The list filters and moves its highlight after typing; press Enter only
+  // once the highlighted result is the one searched for.
+  await expect(
+    picker(page).locator('[cmdk-item][aria-selected="true"]'),
+  ).toContainText("Open an account");
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-id="feed-edge-signal"]')).toHaveAttribute(
     "aria-label",
