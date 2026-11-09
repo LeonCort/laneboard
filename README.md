@@ -2,9 +2,9 @@
 
 A local-first service blueprint canvas for seeing a banking journey across channels. Map services, customer steps, frictions, support, owners and technical capabilities. Compare now and target, then present or share a file.
 
-[Open Laneboard](https://laneboard-tan.vercel.app) · [Source repository](https://github.com/LeonCort/laneboard)
+[Open Laneboard](https://leoncort.github.io/laneboard/) · [Download the single file](https://leoncort.github.io/laneboard/laneboard.html) · [Source repository](https://github.com/LeonCort/laneboard)
 
-**Every journey stays in the browser.** No accounts, backend, analytics, telemetry or AI requests. Static files load from Vercel; IndexedDB stores the workspace. Installed dependencies and fonts are bundled. A service worker caches the app for offline use.
+**Every journey stays in the browser.** No accounts, backend, analytics, telemetry or AI requests. The whole app builds to one self-contained HTML file with every script, style, font and icon inlined. Host it on GitHub Pages, or save it and open it straight from disk on a computer without network access. IndexedDB stores the workspace. On a hosted copy, a small service worker caches the page for offline use.
 
 ## Start
 
@@ -30,11 +30,17 @@ npm run licenses
 npm run sbom
 ```
 
-Browser tests run against the production build. Set `BASE_URL` to test a hosted deployment. Local preview serves the same security headers as Vercel. Browser coverage uses Chromium, Firefox and WebKit. Unit tests cover every friction rule, file repair and validation, structural edits and more than 100 undo/redo steps.
+Browser tests run against the production build. Set `BASE_URL` to test a hosted deployment. Local preview serves the same security headers as Vercel. `tests/e2e/single-file.spec.ts` checks that the build is one file, runs from disk and runs below a sub-path. Browser coverage uses Chromium, Firefox and WebKit. Unit tests cover every friction rule, file repair and validation, structural edits and more than 100 undo/redo steps.
 
 ## Deployment
 
-This is a Vite static site. `vercel.json` defines the build, output directory, CSP, security headers and SPA fallback. Vercel’s Git integration deploys `main` to production and other branches to previews. No runtime environment variables are needed. Keep analytics, speed insights, the Vercel toolbar and other injected scripts disabled; they conflict with the privacy model and CSP.
+`npm run build` writes `dist/index.html`, a single self-contained page (about 1.4 MB, 600 kB gzipped). It uses relative paths only, so it runs at any sub-path and from `file://`. Next to it, `dist/` holds optional extras for a hosted copy: `sw.js` (offline cache), `manifest.webmanifest` and the install icons. The page loads them only over http(s).
+
+**GitHub Pages.** `.github/workflows/pages.yml` tests, builds and deploys `main` to GitHub Pages. Turn it on once in the repository under Settings → Pages → Source: GitHub Actions. The workflow also publishes `laneboard.html`, the same file under a clearer name for downloading, and keeps it as a workflow artifact.
+
+**Offline single file.** Download `laneboard.html` and open it in Chrome or Edge. It makes no network requests. The workspace is saved in that browser profile's local storage, exactly as on the hosted copy, so export backups as usual. Firefox and Safari handle storage for local files differently and are not tested from disk.
+
+**Security policy.** Static hosts cannot send headers, so the build adds a Content Security Policy meta tag. It allows only the inlined script, by its SHA-256 hash, and no external hosts. `vercel.json` still works for a Vercel deploy and adds the headers a meta tag cannot carry (`frame-ancestors`, `Referrer-Policy`, `X-Content-Type-Options`, `Permissions-Policy`). Keep analytics and other injected scripts disabled; they conflict with the privacy model and the policy.
 
 ## Architecture
 
