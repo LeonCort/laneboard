@@ -65,8 +65,11 @@ test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
   // browsers would fetch sw.js from the real network. There the worker is
   // blocked and the test checks the manifest URL, which resolves the same way.
   const intercepted = browserName === "chromium";
+  // Firefox's Playwright driver runs its own page scripts as eval, which the
+  // page's policy blocks when the page comes from a route. The policy itself is
+  // covered by the other browser tests, so bypass it here outside Chromium.
   const context = await browser.newContext(
-    intercepted ? {} : { serviceWorkers: "block" },
+    intercepted ? {} : { serviceWorkers: "block", bypassCSP: true },
   );
   const page = await context.newPage();
   const { errors } = await watch(page);
