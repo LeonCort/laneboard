@@ -38,6 +38,8 @@ Browser tests run against the production build. Set `BASE_URL` to test a hosted 
 
 **GitHub Pages.** `.github/workflows/pages.yml` tests, builds and deploys `main` to GitHub Pages. Turn it on once in the repository under Settings → Pages → Source: GitHub Actions. The workflow also publishes `laneboard.html`, the same file under a clearer name for downloading, and keeps it as a workflow artifact.
 
+**Laneboard files.** Each `.laneboard.json` file is one Laneboard. Open, Save (Ctrl+S, over the same file) and Save as work through the File System Access API in Chrome and Edge, including from `file://`; other browsers open with a file input and save by downloading. See `src/io/file.ts` and the [user guide](docs/USER-GUIDE.md).
+
 **Offline single file.** Download `laneboard.html` and open it in Chrome or Edge. It makes no network requests. The workspace is saved in that browser profile's local storage, exactly as on the hosted copy, so export backups as usual. Firefox and Safari handle storage for local files differently and are not tested from disk.
 
 **Security policy.** Static hosts cannot send headers, so the build adds a Content Security Policy meta tag. It allows only the inlined script, by its SHA-256 hash, and no external hosts. `vercel.json` still works for a Vercel deploy and adds the headers a meta tag cannot carry (`frame-ancestors`, `Referrer-Policy`, `X-Content-Type-Options`, `Permissions-Policy`). Keep analytics and other injected scripts disabled; they conflict with the privacy model and the policy.

@@ -1568,3 +1568,40 @@
     order: 2;
   }
 }
+
+/* Linked Laneboard file: name, with a dot while there are unsaved changes */
+.lb-filestate {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+.lb-filestate:hover {
+  color: var(--text);
+}
+.lb-filestate__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-filestate[data-dirty="true"]::after {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+@media (max-width: 1200px) {
+  .lb-filestate__name {
+    max-width: 120px;
+  }
+}

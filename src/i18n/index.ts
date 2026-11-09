@@ -377,6 +377,21 @@ export const en = {
   selectToolLabel: "tool",
   searchActions: "Search actions…",
   localDefault: "Laneboard · stored on your device",
+  openFile: "Open Laneboard file…",
+  saveToFile: "Save",
+  saveFileAs: "Save as…",
+  newLaneboard: "New empty Laneboard",
+  unsavedChanges: "Unsaved changes",
+  savedToFile: "Saved to file",
+  notInFile: "Not saved to a file",
+  replaceTitle: "Replace the current Laneboard?",
+  replaceUnsaved:
+    "Changes that are not saved to a file will be lost. Save first if you want to keep them.",
+  replaceConfirm: "Continue without saving",
+  fileOpened: "Opened",
+  fileSavedAs: "Saved",
+  downloadedCopy:
+    "This browser cannot save over files, so a copy was downloaded:",
 };
 export type Key = keyof typeof en;
 export const sv: Record<Key, string> = {
@@ -759,6 +774,21 @@ export const sv: Record<Key, string> = {
   selectToolLabel: "verktyg",
   searchActions: "Sök åtgärder…",
   localDefault: "Laneboard · lagrat på din enhet",
+  openFile: "Öppna Laneboard-fil…",
+  saveToFile: "Spara",
+  saveFileAs: "Spara som…",
+  newLaneboard: "Ny tom Laneboard",
+  unsavedChanges: "Osparade ändringar",
+  savedToFile: "Sparad till fil",
+  notInFile: "Inte sparad till fil",
+  replaceTitle: "Ersätta nuvarande Laneboard?",
+  replaceUnsaved:
+    "Ändringar som inte är sparade till en fil går förlorade. Spara först om du vill behålla dem.",
+  replaceConfirm: "Fortsätt utan att spara",
+  fileOpened: "Öppnade",
+  fileSavedAs: "Sparade",
+  downloadedCopy:
+    "Den här webbläsaren kan inte spara över filer, så en kopia laddades ner:",
 };
 export function useT() {
   const lang = useStore((s) => s.workspace.settings.language);

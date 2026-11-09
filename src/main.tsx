@@ -10,6 +10,7 @@ import "./styles/laneboard.css";
 import Editor from "./Editor";
 import { exportJSON } from "./io/export";
 import { hydrate, useStore } from "./store";
+import { restoreFileLink } from "./io/file";
 function App() {
   const ready = useStore((s) => s.ready);
   return ready ? (
@@ -60,7 +61,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </ErrorBoundary>,
 );
-void hydrate();
+void hydrate().then(restoreFileLink);
 // The same single HTML file runs from a web host and from disk (file://). Only a
 // web origin can install the offline worker and the app manifest.
 if (import.meta.env.PROD && /^https?:$/.test(location.protocol)) {
