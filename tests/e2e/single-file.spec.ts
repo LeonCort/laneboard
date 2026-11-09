@@ -102,14 +102,14 @@ test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
     "href",
     "manifest.webmanifest",
   );
-  expect(
-    await page.evaluate(
-      () =>
-        new URL(
-          document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href,
-        ).pathname,
-    ),
-  ).toBe("/laneboard/manifest.webmanifest");
+  // Resolved here rather than with page.evaluate, which Firefox runs as eval
+  // under the page's policy.
+  const manifest = await page
+    .locator('link[rel="manifest"]')
+    .getAttribute("href");
+  expect(new URL(manifest!, page.url()).pathname).toBe(
+    "/laneboard/manifest.webmanifest",
+  );
   if (intercepted)
     await expect.poll(() => served.includes("/laneboard/sw.js")).toBe(true);
   expect(served.every((p) => p.startsWith("/laneboard/"))).toBe(true);
