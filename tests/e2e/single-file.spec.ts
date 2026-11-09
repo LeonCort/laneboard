@@ -57,23 +57,19 @@ test("the downloaded file works from disk and keeps the workspace", async ({
   expect(errors).toEqual([]);
 });
 test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
-  page,
-  context,
+  browser,
   browserName,
 }) => {
   test.skip(!!process.env.BASE_URL, "needs the local build");
-  const { errors } = await watch(page);
-  // Playwright routes service worker requests only in Chromium. Elsewhere,
-  // record which worker URL the page asks for instead of fetching it.
+  // Playwright routes service worker requests only in Chromium, so other
+  // browsers would fetch sw.js from the real network. There the worker is
+  // blocked and the test checks the manifest URL, which resolves the same way.
   const intercepted = browserName === "chromium";
-  if (!intercepted)
-    await page.addInitScript(() => {
-      const w = window as unknown as { __sw?: string };
-      navigator.serviceWorker.register = (url: string | URL) => {
-        w.__sw = new URL(url, location.href).pathname;
-        return new Promise(() => {});
-      };
-    });
+  const context = await browser.newContext(
+    intercepted ? {} : { serviceWorkers: "block" },
+  );
+  const page = await context.newPage();
+  const { errors } = await watch(page);
   const served: string[] = [];
   const types: Record<string, string> = {
     html: "text/html",
@@ -82,7 +78,7 @@ test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
     svg: "image/svg+xml",
     png: "image/png",
   };
-  // Context routes also see the service worker script request.
+  // Context routes also see the service worker script request in Chromium.
   await context.route("https://pages.example/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     served.push(path);
@@ -102,17 +98,21 @@ test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
   await page.goto("https://pages.example/laneboard/");
   await page.getByRole("button", { name: "Open mortgage example" }).click();
   await expect(page.getByTestId("kpi-restarts")).toHaveText("1");
-  await expect
-    .poll(() =>
-      intercepted
-        ? served.includes("/laneboard/sw.js")
-        : page.evaluate(
-            () =>
-              (window as unknown as { __sw?: string }).__sw ===
-              "/laneboard/sw.js",
-          ),
-    )
-    .toBe(true);
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
+    "href",
+    "manifest.webmanifest",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        new URL(
+          document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href,
+        ).pathname,
+    ),
+  ).toBe("/laneboard/manifest.webmanifest");
+  if (intercepted)
+    await expect.poll(() => served.includes("/laneboard/sw.js")).toBe(true);
   expect(served.every((p) => p.startsWith("/laneboard/"))).toBe(true);
   expect(errors).toEqual([]);
+  await context.close();
 });
