@@ -35,17 +35,22 @@ async function openLinks(page: Page, id: string) {
 }
 async function dragLink(page: Page, from: string, to: string, valid = true) {
   await card(page, from).hover();
-  const plus = await card(page, from)
-      .getByRole("button", { name: /^Add link from/ })
-      .boundingBox(),
+  const button = card(page, from).getByRole("button", {
+    name: /^Add link from/,
+  });
+  // The plus appears on hover; measure it only once it is shown, so the press
+  // lands on the handle on slower machines too.
+  await expect(button).toBeVisible();
+  const plus = await button.boundingBox(),
     target = await card(page, to).boundingBox();
   expect(plus).not.toBeNull();
   expect(target).not.toBeNull();
   await page.mouse.move(plus!.x + plus!.width / 2, plus!.y + plus!.height / 2);
   await page.mouse.down();
   await page.mouse.move(
-    plus!.x + plus!.width / 2 + 5,
+    plus!.x + plus!.width / 2 + 8,
     plus!.y + plus!.height / 2,
+    { steps: 4 },
   );
   await expect(card(page, to).locator(".lb-card")).toHaveAttribute(
     "data-link-target",

@@ -279,26 +279,42 @@ function EditorInner() {
   useEffect(() => {
     const element = editorRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setCanvasSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      }),
-    );
+    // Apply sizes in the next frame: changing layout inside the observer
+    // callback makes WebKit report "ResizeObserver loop completed" errors.
+    let frame = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() =>
+        setCanvasSize((size) =>
+          size.width === width && size.height === height
+            ? size
+            : { width, height },
+        ),
+      );
+    });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, []);
   const presenting = present !== null;
   useEffect(() => {
     const element = guideRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setGuideHeight(
-        entry.borderBoxSize?.[0]?.blockSize || element.offsetHeight,
-      ),
-    );
+    let frame = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      const height =
+        entry.borderBoxSize?.[0]?.blockSize || element.offsetHeight;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setGuideHeight(height));
+    });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [presenting]);
   const notify = useCallback((message: string) => {
     setToast(message);
