@@ -59,9 +59,21 @@ test("the downloaded file works from disk and keeps the workspace", async ({
 test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
   page,
   context,
+  browserName,
 }) => {
   test.skip(!!process.env.BASE_URL, "needs the local build");
   const { errors } = await watch(page);
+  // Playwright routes service worker requests only in Chromium. Elsewhere,
+  // record which worker URL the page asks for instead of fetching it.
+  const intercepted = browserName === "chromium";
+  if (!intercepted)
+    await page.addInitScript(() => {
+      const w = window as unknown as { __sw?: string };
+      navigator.serviceWorker.register = (url: string | URL) => {
+        w.__sw = new URL(url, location.href).pathname;
+        return new Promise(() => {});
+      };
+    });
   const served: string[] = [];
   const types: Record<string, string> = {
     html: "text/html",
@@ -90,7 +102,17 @@ test("the hosted copy runs below a sub-path such as GitHub Pages", async ({
   await page.goto("https://pages.example/laneboard/");
   await page.getByRole("button", { name: "Open mortgage example" }).click();
   await expect(page.getByTestId("kpi-restarts")).toHaveText("1");
-  await expect.poll(() => served.includes("/laneboard/sw.js")).toBe(true);
+  await expect
+    .poll(() =>
+      intercepted
+        ? served.includes("/laneboard/sw.js")
+        : page.evaluate(
+            () =>
+              (window as unknown as { __sw?: string }).__sw ===
+              "/laneboard/sw.js",
+          ),
+    )
+    .toBe(true);
   expect(served.every((p) => p.startsWith("/laneboard/"))).toBe(true);
   expect(errors).toEqual([]);
 });
