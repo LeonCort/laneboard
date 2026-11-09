@@ -179,6 +179,11 @@ test("feed search works in a smaller window without opening a second pane", asyn
   await picker(page)
     .getByRole("combobox", { name: "Find a connection" })
     .fill("Open an account");
+  // The list filters and moves its highlight after typing; press Enter only
+  // once the highlighted result is the one searched for.
+  await expect(
+    picker(page).locator('[cmdk-item][aria-selected="true"]'),
+  ).toContainText("Open an account");
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-id="feed-edge-signal"]')).toHaveAttribute(
     "aria-label",

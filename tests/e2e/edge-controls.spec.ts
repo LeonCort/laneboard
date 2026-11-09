@@ -61,41 +61,49 @@ async function selectEdge(
       previous = current;
     }
   });
-  let point: { x: number; y: number } | null = null;
-  await expect
-    .poll(
-      async () => {
-        point = await edge(page, id)
-          .locator(".lb-edge")
-          .evaluate((path) => {
-            const line = path as SVGPathElement,
-              id = line.closest(".react-flow__edge")!.getAttribute("data-id");
-            for (const fraction of [
-              0.5,
-              0.25,
-              0.75,
-              ...Array.from({ length: 19 }, (_, i) => (i + 1) / 20),
-            ]) {
-              const point = line
-                .getPointAtLength(line.getTotalLength() * fraction)
-                .matrixTransform(line.getScreenCTM()!);
-              if (
-                document
-                  .elementFromPoint(point.x, point.y)
-                  ?.closest(".react-flow__edge")
-                  ?.getAttribute("data-id") === id
-              )
-                return { x: point.x, y: point.y };
-            }
-            return null;
-          });
-        return point;
-      },
-      { message: "Connection has an exposed clickable path" },
-    )
-    .toBeTruthy();
-  await page.mouse.click(point!.x, point!.y, { button });
-  await expect(page.locator(`[data-edge-controls="${id}"]`)).toBeVisible();
+  // On slower machines the canvas can still shift between finding the path
+  // and the click landing, so repeat the click until the edge is selected.
+  const controls = page.locator(`[data-edge-controls="${id}"]`);
+  const menu = page.locator(".lb-context-menu");
+  await expect(async () => {
+    // A menu from an earlier right-click would cover the path.
+    if (await menu.isVisible()) await page.keyboard.press("Escape");
+    let point: { x: number; y: number } | null = null;
+    await expect
+      .poll(
+        async () => {
+          point = await edge(page, id)
+            .locator(".lb-edge")
+            .evaluate((path) => {
+              const line = path as SVGPathElement,
+                id = line.closest(".react-flow__edge")!.getAttribute("data-id");
+              for (const fraction of [
+                0.5,
+                0.25,
+                0.75,
+                ...Array.from({ length: 19 }, (_, i) => (i + 1) / 20),
+              ]) {
+                const point = line
+                  .getPointAtLength(line.getTotalLength() * fraction)
+                  .matrixTransform(line.getScreenCTM()!);
+                if (
+                  document
+                    .elementFromPoint(point.x, point.y)
+                    ?.closest(".react-flow__edge")
+                    ?.getAttribute("data-id") === id
+                )
+                  return { x: point.x, y: point.y };
+              }
+              return null;
+            });
+          return point;
+        },
+        { message: "Connection has an exposed clickable path" },
+      )
+      .toBeTruthy();
+    await page.mouse.click(point!.x, point!.y, { button });
+    await expect(controls).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20000 });
 }
 async function reconnect(
   page: Page,
@@ -194,12 +202,18 @@ test("search changes either endpoint with keyboard and deletes only the connecti
     .locator(".lb-link-popover")
     .getByRole("combobox", { name: "Find a connection" });
   await search.fill("Budget planner");
+  await expect(
+    page.locator('.lb-link-popover [cmdk-item][aria-selected="true"]'),
+  ).toContainText("Budget planner");
   await page.keyboard.press("Enter");
   await expect(
     edge(page, "service-link-service-options-app-service-budget-app"),
   ).toBeVisible();
   await controls(page).getByRole("button", { name: "Change source" }).click();
   await search.fill("Open savings account");
+  await expect(
+    page.locator('.lb-link-popover [cmdk-item][aria-selected="true"]'),
+  ).toContainText("Open savings account");
   await page.keyboard.press("Enter");
   const changed = "service-link-service-account-app-service-budget-app";
   await expect(edge(page, changed)).toBeAttached();
@@ -237,6 +251,9 @@ test("feed and journey edges can be removed and retargeted while preserving all 
     .locator(".lb-link-popover")
     .getByRole("combobox", { name: "Find a connection" })
     .fill("Review account");
+  await expect(
+    page.locator('.lb-link-popover [cmdk-item][aria-selected="true"]'),
+  ).toContainText("Review account");
   await page.keyboard.press("Enter");
   await expect(edge(page, "feed-edge-signal")).toHaveAttribute(
     "aria-label",
@@ -251,6 +268,9 @@ test("feed and journey edges can be removed and retargeted while preserving all 
     .locator(".lb-link-popover")
     .getByRole("combobox", { name: "Find a connection" })
     .fill("Review account");
+  await expect(
+    page.locator('.lb-link-popover [cmdk-item][aria-selected="true"]'),
+  ).toContainText("Review account");
   await page.keyboard.press("Enter");
   await expect(edge(page, "edge-compare-review")).toBeAttached();
   await controls(page)
